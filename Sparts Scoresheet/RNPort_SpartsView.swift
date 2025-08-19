@@ -57,6 +57,38 @@ private struct Cell: View {
     }
 }
 
+// MARK: - AutoFitText (with optional fixed size)
+// If fixedPointSize is provided, that exact size is used (uniform across siblings).
+// Otherwise it derives size from the view's height and number of lines.
+struct AutoFitText: View {
+    let text: String
+    var weight: Font.Weight = .semibold
+    var design: Font.Design = .default
+    var alignment: TextAlignment = .center
+    var lines: Int = 1
+    var padding: CGFloat = 0
+    var minScale: CGFloat = 0.7
+    var baselineFactor: CGFloat = 0.84
+    var fixedPointSize: CGFloat? = nil
+
+    var body: some View {
+        GeometryReader { geo in
+            let size: CGFloat = {
+                if let fixed = fixedPointSize { return fixed }
+                let perLineHeight = max((geo.size.height - padding * 2) / CGFloat(max(lines,1)), 1)
+                return perLineHeight * baselineFactor
+            }()
+            Text(text)
+                .font(.system(size: size, weight: weight, design: design))
+                .multilineTextAlignment(alignment)
+                .lineLimit(lines)
+                .minimumScaleFactor(minScale)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                .padding(.horizontal, padding)
+        }
+    }
+}
+
 
 
 
@@ -111,54 +143,89 @@ struct RNPort_SpartsView: View {
     private var leftTotalWidth: CGFloat  { wName + (2 * wNarrow) + (3 * wHearts) }   // 120 + 160 + 240 = 520
     private var rightTotalWidth: CGFloat { wTeam + (8 * wScore) }                    // 100 + 8*80 = 740
     private let interTableGap: CGFloat   = 24
-    private var contentWidth: CGFloat    { leftTotalWidth + interTableGap + rightTotalWidth }
 
-    // A conservative estimated content height (title + header + rows + gaps)
-    // You can tweak these numbers if your rows change height later.
-    private var estimatedContentHeight: CGFloat {
-        let title: CGFloat = 44
-        let leftTable: CGFloat = 40 /*header*/ + (rowH * 2) // two rows (labels + inputs)
-        let rightTable: CGFloat = 40 /*header*/ + (56 * 2)  // two team rows at 56
-        let tallestTables: CGFloat = max(leftTable, rightTable)
-        let gaps: CGFloat = 24 /*title-to-tables*/ + 20 /*bottom padding*/
-        return title + tallestTables + gaps
+    // One shared size for ALL headers so they stay uniform.
+    // Derived from header row height assuming worst-case 2 lines.
+    private var headerPointSize: CGFloat {
+        (rowH / 2) * 0.84 // 0.84 ≈ SF's line-height fudge factor
     }
+
+    
+    // --- Percent controls (you can tweak live) ---
+    @State private var leftTableWidthAsPercent:  CGFloat = 41   // % of usable screen width
+    @State private var rightTableWidthAsPercent: CGFloat = 58   // % of usable screen width
+    @State private var leftTableHeightAsPercent: CGFloat = 80   // % of usable screen height
+    @State private var rightTableHeightAsPercent: CGFloat = 80  // % of usable screen height
+
 
     var body: some View {
         GeometryReader { geo in
-            // Leave a little padding around the content so it doesn’t hug the edges
-            let horizontalPadding: CGFloat = 24
-            let verticalPadding: CGFloat = 24
+            // Padding so content isn't glued to the edges
+            let hPad: CGFloat = 24
+            let vPad: CGFloat = 24
+            let usableW = max(geo.size.width  - hPad*2, 1)
+            let usableH = max(geo.size.height - vPad*2, 1)
 
-            // Scale factors to fit width and height; clamp to <= 1 so we never upscale
-            let sx = (geo.size.width  - (horizontalPadding * 2)) / max(contentWidth, 1)
-            let sy = (geo.size.height - (verticalPadding * 2)) / max(estimatedContentHeight, 1)
-            let s  = min(sx, sy, 1)
+            // Percent-based target sizes (you can tweak the percents live)
+            let leftW  = usableW * (leftTableWidthAsPercent  / 100)
+            let rightW = usableW * (rightTableWidthAsPercent / 100)
+            let leftH  = usableH * (leftTableHeightAsPercent / 100)
+            let rightH = usableH * (rightTableHeightAsPercent / 100)
 
-            ZStack {
-                Color(.systemBackground)
+            // Fixed visual gap between the tables
+            let gap: CGFloat = 16
 
-                VStack(spacing: 24) {
-                    Text("Card Game Scoresheet")
-                        .font(.title.bold())
+            // Scale the *design-time* tables to fit their percent boxes
+            let leftDesignW:  CGFloat = leftTotalWidth
+            let rightDesignW: CGFloat = rightTotalWidth
+            let leftDesignH:  CGFloat = (40 + rowH*2)     // header + two rows
+            let rightDesignH: CGFloat = (40 + 56*2)       // header + two rows
+
+            let leftScale  = min(leftW / leftDesignW,   leftH / leftDesignH)
+            let rightScale = min(rightW / rightDesignW, rightH / rightDesignH)
+
+            ZStack(alignment: .topLeading) {
+                Color(.systemBackground).ignoresSafeArea()
+
+                // MAIN OVERALL BOUNDING BOX (represents the total usable space)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(.systemGray6)) // very light background
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+
+                    VStack(spacing: 24) {
+                        Text("Card Game Scoresheet")
+                            .font(.title.bold())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        HStack(alignment: .top, spacing: gap) {
+                            // LEFT TABLE
+                            playerInfoTable
+                                .frame(width: leftDesignW, height: leftDesignH, alignment: .topLeading)
+                                .scaleEffect(leftScale, anchor: .topLeading)
+                                .frame(width: leftW, height: leftH, alignment: .topLeading)
+                                .clipped()
+
+                            // RIGHT TABLE
+                            teamScoresTable
+                                .frame(width: rightDesignW, height: rightDesignH, alignment: .topLeading)
+                                .scaleEffect(rightScale, anchor: .topLeading)
+                                .frame(width: rightW, height: rightH, alignment: .topLeading)
+                                .clipped()
+                        }
                         .frame(maxWidth: .infinity, alignment: .leading)
-
-                    // fixed design width while unscaled; keeps your HStacks aligned
-                    HStack(alignment: .top, spacing: interTableGap) {
-                        playerInfoTable
-                        teamScoresTable
+                        .padding(12) // inner breathing room inside the big box
                     }
-                    .frame(width: contentWidth, alignment: .topLeading)
                 }
-                .frame(width: contentWidth, height: estimatedContentHeight, alignment: .topLeading)
-                .scaleEffect(s, anchor: .topLeading)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, horizontalPadding)
-                .padding(.vertical, verticalPadding)
+                .frame(width: usableW, height: usableH, alignment: .topLeading)
+                .padding(.horizontal, hPad)
+                .padding(.vertical, vPad)
             }
-            .ignoresSafeArea() // show full-bleed if you like
+            .ignoresSafeArea(edges: .horizontal)
         }
     }
+
 
 
     // MARK: - Left: Player Information Table
@@ -167,9 +234,15 @@ struct RNPort_SpartsView: View {
         VStack(spacing: 0) {
             // Header: Team Member | Spades | Hearts
             HStack(spacing: 0) {
-                Cell(width: wName, height: rowH) { Text("TEAM\nMEMBER").font(.caption.weight(.semibold)).multilineTextAlignment(.center) }
-                Cell(width: wNarrow*2, height: rowH) { Text("SPADES").font(.caption.weight(.semibold)) }
-                Cell(width: wNarrow*3, height: rowH) { Text("HEARTS").font(.caption.weight(.semibold)) }
+                Cell(width: wName, height: rowH) {
+                    AutoFitText(text: "TEAM\nMEMBER", lines: 2, minScale: 1, fixedPointSize: headerPointSize)
+                }
+                Cell(width: wNarrow*2, height: rowH) {
+                    AutoFitText(text: "SPADES", lines: 1, minScale: 1, fixedPointSize: headerPointSize)
+                }
+                Cell(width: wNarrow*3, height: rowH) {
+                    AutoFitText(text: "HEARTS", lines: 1, minScale: 1, fixedPointSize: headerPointSize)
+                }
             }
 
             ForEach($teams) { $team in
@@ -249,15 +322,16 @@ struct RNPort_SpartsView: View {
         VStack(spacing: 0) {
             // Header row
             HStack(spacing: 0) {
-                Cell(width: wTeam,  height: rowH) { Text("TEAM").font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Spades\nScore").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Hearts\nScore").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Hand\nScore").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Hand\nBags").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("All\nBags").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Spades\nTotal").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Hearts\nTotal").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
-                Cell(width: wScore, height: rowH) { Text("Game\nTotal").multilineTextAlignment(.center).font(.caption.weight(.semibold)) }
+                Cell(width: wTeam,  height: rowH) { AutoFitText(text: "TEAM",          lines: 1, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Spades\nScore",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hearts\nScore",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hand\nScore",    lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hand\nBags",     lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "All\nBags",      lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Spades\nTotal",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hearts\nTotal",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+                Cell(width: wScore, height: rowH) { AutoFitText(text: "Game\nTotal",    lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
+
             }
 
             ForEach($teams) { $team in
@@ -280,9 +354,9 @@ struct RNPort_SpartsView: View {
                     Cell(width: wScore, height: 56) { numberField($team.data.allBags)    }
 
                     // Totals as large labels (read-only styling for now)
-                    Cell(width: wScore, height: 56) { Text("\(team.data.spadesTotal)").font(.headline).monospacedDigit() }
-                    Cell(width: wScore, height: 56) { Text("\(team.data.heartsTotal)").font(.headline).monospacedDigit() }
-                    Cell(width: wScore, height: 56) { Text("\(team.data.gameTotal)").font(.headline).monospacedDigit() }
+                    Cell(width: wScore, height: 56) { AutoFitText(text: "\(team.data.spadesTotal)", weight: .bold, lines: 1, minScale: 0.6) }
+                    Cell(width: wScore, height: 56) { AutoFitText(text: "\(team.data.heartsTotal)", weight: .bold, lines: 1, minScale: 0.6) }
+                    Cell(width: wScore, height: 56) { AutoFitText(text: "\(team.data.gameTotal)",   weight: .bold, lines: 1, minScale: 0.6) }
                 }
             }
         }
