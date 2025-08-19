@@ -157,48 +157,61 @@ struct RNPort_SpartsView: View {
     @State private var leftTableHeightAsPercent: CGFloat = 80   // % of usable screen height
     @State private var rightTableHeightAsPercent: CGFloat = 80  // % of usable screen height
 
+    // Overall canvas (the big rounded box) as % of the safe area
+    @State private var overallWidthPercent:  CGFloat = 100   // % of safe-area width
+    @State private var overallHeightPercent: CGFloat = 88   // % of safe-area height
+    @State private var overallInnerPadding: CGFloat = 6    // padding inside the big box
 
     var body: some View {
         GeometryReader { geo in
-            // Padding so content isn't glued to the edges
-            let hPad: CGFloat = 24
-            let vPad: CGFloat = 24
-            let usableW = max(geo.size.width  - hPad*2, 1)
-            let usableH = max(geo.size.height - vPad*2, 1)
+            // SAFE-AREA size
+            let safeW = max(geo.size.width, 1)
+            let safeH = max(geo.size.height, 1)
 
-            // Percent-based target sizes (you can tweak the percents live)
+            // MAIN OVERALL BOUNDING BOX size (percent of safe area)
+            let overallW = safeW * (overallWidthPercent  / 100)
+            let overallH = safeH * (overallHeightPercent / 100)
+
+            // Inner working area for the two tables
+            let innerPad = overallInnerPadding
+            let usableW = max(overallW - innerPad * 2, 1)
+            let usableH = max(overallH - innerPad * 2, 1)
+
+            // Percent-based target sizes for each table
             let leftW  = usableW * (leftTableWidthAsPercent  / 100)
             let rightW = usableW * (rightTableWidthAsPercent / 100)
             let leftH  = usableH * (leftTableHeightAsPercent / 100)
             let rightH = usableH * (rightTableHeightAsPercent / 100)
 
-            // Fixed visual gap between the tables
-            let gap: CGFloat = 16
-
-            // Scale the *design-time* tables to fit their percent boxes
+            // Design (unscaled) sizes
             let leftDesignW:  CGFloat = leftTotalWidth
             let rightDesignW: CGFloat = rightTotalWidth
-            let leftDesignH:  CGFloat = (40 + rowH*2)     // header + two rows
-            let rightDesignH: CGFloat = (40 + 56*2)       // header + two rows
+            let leftDesignH:  CGFloat = (40 + rowH*2)
+            let rightDesignH: CGFloat = (40 + 56*2)
 
+            // Scale to fit percent boxes
             let leftScale  = min(leftW / leftDesignW,   leftH / leftDesignH)
             let rightScale = min(rightW / rightDesignW, rightH / rightDesignH)
 
-            ZStack(alignment: .topLeading) {
-                Color(.systemBackground).ignoresSafeArea()
+            // Gap between the two tables
+            let gap: CGFloat = 6
 
-                // MAIN OVERALL BOUNDING BOX (represents the total usable space)
+            ZStack {
+                Color(.systemBackground) // page bg
+
+                // MAIN OVERALL BOUNDING BOX (shows the total space you're allocating)
                 ZStack {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(.systemGray6)) // very light background
+                        .fill(Color(.systemGray6)) // light background
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.gray.opacity(0.5), lineWidth: 1)
 
-                    VStack(spacing: 24) {
+                    VStack(spacing: 12) {
                         Text("Card Game Scoresheet")
                             .font(.title.bold())
                             .frame(maxWidth: .infinity, alignment: .leading)
 
+                        // Tables region
                         HStack(alignment: .top, spacing: gap) {
                             // LEFT TABLE
                             playerInfoTable
@@ -215,16 +228,18 @@ struct RNPort_SpartsView: View {
                                 .clipped()
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12) // inner breathing room inside the big box
+                        .padding(.horizontal, 0)
+                        .padding(.bottom, 4)
                     }
+                    .padding(innerPad)
                 }
-                .frame(width: usableW, height: usableH, alignment: .topLeading)
-                .padding(.horizontal, hPad)
-                .padding(.vertical, vPad)
+                // Place the big box centered in the safe area (or change to .topLeading if you prefer)
+                .frame(width: overallW, height: overallH, alignment: .center)
             }
-            .ignoresSafeArea(edges: .horizontal)
+            .frame(width: safeW, height: safeH, alignment: .center)
         }
     }
+
 
 
 
