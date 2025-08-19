@@ -11,7 +11,7 @@ import SwiftUI
 struct Sparts_ScoresheetApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RNPort_SpartsView()
         }
     }
 }
