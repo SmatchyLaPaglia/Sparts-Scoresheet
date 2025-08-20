@@ -28,11 +28,11 @@ struct TeamData: Identifiable, Hashable {
 
 struct Team: Identifiable, Hashable {
     let id: Int
-    var players: [Player]    // exactly two
+    var players: [Player]
     var data: TeamData
 }
 
-// MARK: - Reusable Cell
+// MARK: - Small UI Helpers
 
 private struct Cell: View {
     let width: CGFloat
@@ -57,13 +57,10 @@ private struct Cell: View {
     }
 }
 
-// iOS-friendly checkbox using SF Symbols; no Toggle needed.
 private struct CheckBox: View {
     @Binding var isOn: Bool
     var body: some View {
-        Button {
-            isOn.toggle()
-        } label: {
+        Button { isOn.toggle() } label: {
             Image(systemName: isOn ? "checkmark.square.fill" : "square")
                 .imageScale(.medium)
         }
@@ -73,10 +70,6 @@ private struct CheckBox: View {
     }
 }
 
-
-// MARK: - AutoFitText (with optional fixed size)
-// If fixedPointSize is provided, that exact size is used (uniform across siblings).
-// Otherwise it derives size from the view's height and number of lines.
 struct AutoFitText: View {
     let text: String
     var weight: Font.Weight = .semibold
@@ -92,27 +85,81 @@ struct AutoFitText: View {
         GeometryReader { geo in
             let size: CGFloat = {
                 if let fixed = fixedPointSize { return fixed }
-                let perLineHeight = max((geo.size.height - padding * 2) / CGFloat(max(lines,1)), 1)
-                return perLineHeight * baselineFactor
+                let perLine = max((geo.size.height - padding * 2) / CGFloat(max(lines,1)), 1)
+                return perLine * baselineFactor
             }()
             Text(text)
                 .font(.system(size: size, weight: weight, design: design))
                 .multilineTextAlignment(alignment)
                 .lineLimit(lines)
                 .minimumScaleFactor(minScale)
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                .frame(width: geo.size.width, height: geo.size.height)
                 .padding(.horizontal, padding)
         }
     }
 }
 
+// MARK: - Percent-Driven Layout
 
+/// Everything derives from these percents.
+private struct LayoutPercents {
+    var overallWidthPercent:  CGFloat = 100   // of safe area
+    var overallHeightPercent: CGFloat = 88    // of safe area
+    var overallInnerPadding: CGFloat = 8      // points inside the big rounded box
 
+    var leftTableWidthAsPercent:   CGFloat = 44
+    var gapBetweenTablesAsPercent: CGFloat = 2
+    var rightTableWidthAsPercent:  CGFloat { max(0, 100 - leftTableWidthAsPercent - gapBetweenTablesAsPercent) }
+
+    var tablesHeightPercent: CGFloat = 80     // both tables use the same percent of box height
+}
+
+/// Left table metrics expressed as absolute points, derived from percents.
+private struct LeftMetrics {
+    // Column *fractions* of the left table’s width (sum = 1.0)
+    // Name 120, 3×Narrow(80), 3×Hearts(80) -> total 600 baseline
+    static let nameFrac:   CGFloat = 120/600
+    static let narrowFrac: CGFloat =  80/600
+    static let heartsFrac: CGFloat =  80/600
+
+    let wName: CGFloat
+    let wNarrow: CGFloat
+    let wHearts: CGFloat
+    let rowH: CGFloat
+    let headerPointSize: CGFloat
+
+    init(leftWidth: CGFloat, leftHeight: CGFloat, rowsBelowHeader: CGFloat = 4) {
+        wName   = leftWidth * Self.nameFrac
+        wNarrow = leftWidth * Self.narrowFrac
+        wHearts = leftWidth * Self.heartsFrac
+
+        // header + 4 rows (two players x 2 rows each)
+        rowH = max(28, leftHeight / (1 + rowsBelowHeader))
+        headerPointSize = (rowH / 2) * 0.84   // 2 lines in some headers
+    }
+}
+
+/// Right table metrics in points, derived from percents.
+private struct RightMetrics {
+    // 8 equal score columns
+    let wScore: CGFloat
+    let rowHHeader: CGFloat
+    let rowHData: CGFloat
+    let totalsPointSize: CGFloat
+
+    init(rightWidth: CGFloat, rightHeight: CGFloat, pairedWith leftRowH: CGFloat) {
+        wScore = rightWidth / 8
+        rowHHeader = leftRowH
+        rowHData   = leftRowH * 2       // align to two left rows
+        totalsPointSize = leftRowH * 0.80
+    }
+}
 
 // MARK: - Main View
 
 struct RNPort_SpartsView: View {
-    // Seed with the values from your React example
+    @State private var layout = LayoutPercents()
+
     @State private var teams: [Team] = [
         Team(
             id: 1,
@@ -120,13 +167,10 @@ struct RNPort_SpartsView: View {
                 Player(id: 1, name: "Lecia",  bid: 4, took: 4, spades: 0),
                 Player(id: 2, name: "Arthur", bid: 2, took: 2, spades: 5)
             ],
-            data: TeamData(
-                id: 1, name: "Team 1",
-                hearts: 0, queensSpades: true, moonShot: false,
-                spadesScore: 60, heartsScore: 72, handScore: -12,
-                handBags: 0, allBags: 0,
-                spadesTotal: 60, heartsTotal: 72, gameTotal: -12
-            )
+            data: TeamData(id: 1, name: "Team 1",
+                           hearts: 0, queensSpades: true, moonShot: false,
+                           spadesScore: 60, heartsScore: 72, handScore: -12,
+                           handBags: 0, allBags: 0, spadesTotal: 60, heartsTotal: 72, gameTotal: -12)
         ),
         Team(
             id: 2,
@@ -134,288 +178,178 @@ struct RNPort_SpartsView: View {
                 Player(id: 3, name: "Elena", bid: 4, took: 7, spades: 0),
                 Player(id: 4, name: "Jesse", bid: 0, took: 0, spades: 8)
             ],
-            data: TeamData(
-                id: 2, name: "Team 2",
-                hearts: 0, queensSpades: false, moonShot: false,
-                spadesScore: 0, heartsScore: 0, handScore: 0,
-                handBags: 0, allBags: 0,
-                spadesTotal: 0, heartsTotal: 0, gameTotal: 0
-            )
+            data: TeamData(id: 2, name: "Team 2",
+                           hearts: 0, queensSpades: false, moonShot: false,
+                           spadesScore: 0, heartsScore: 0, handScore: 0,
+                           handBags: 0, allBags: 0, spadesTotal: 0, heartsTotal: 0, gameTotal: 0)
         )
     ]
 
     private let nums = Array(0...13)
 
-    // Column widths (tuned to your React grid values)
-    private let wName: CGFloat   = 120
-    private let wNarrow: CGFloat = 80
-    private let wHearts: CGFloat = 80  // numeric cell within "Hearts" column
-    private let rowH: CGFloat    = 40
-    
-    // Right table rows should align to two left rows (labels + inputs)
-    private let rightRowH: CGFloat = 2 * 40
-
-    // Smaller, uniform totals font (independent of the taller right rows)
-    private var totalsPointSize: CGFloat { rowH * 0.95 }
-
-
-    // Right table widths
-    private let wTeam: CGFloat   = 100
-    private let wScore: CGFloat  = 80
-    
-    // Total widths for left and right tables (based on the fixed column widths above)
-    private var leftTotalWidth: CGFloat  { wName + (2 * wNarrow) + (3 * wHearts) }   // 120 + 160 + 240 = 520
-    private var rightTotalWidth: CGFloat { wTeam + (8 * wScore) }                    // 100 + 8*80 = 740
-    private let interTableGap: CGFloat   = 24
-
-    // One shared size for ALL headers so they stay uniform.
-    // Derived from header row height assuming worst-case 2 lines.
-    private var headerPointSize: CGFloat {
-        (rowH / 2) * 0.84 // 0.84 ≈ SF's line-height fudge factor
-    }
-
-    
-    // --- Percent controls (you can tweak live) ---
-    @State private var leftTableWidthAsPercent:  CGFloat = 41   // % of usable screen width
-    @State private var rightTableWidthAsPercent: CGFloat = 58   // % of usable screen width
-    @State private var leftTableHeightAsPercent: CGFloat = 80   // % of usable screen height
-    @State private var rightTableHeightAsPercent: CGFloat = 80  // % of usable screen height
-
-    // Overall canvas (the big rounded box) as % of the safe area
-    @State private var overallWidthPercent:  CGFloat = 100   // % of safe-area width
-    @State private var overallHeightPercent: CGFloat = 88   // % of safe-area height
-    @State private var overallInnerPadding: CGFloat = 6    // padding inside the big box
-
     var body: some View {
         GeometryReader { geo in
-            // SAFE-AREA size
-            let safeW = max(geo.size.width, 1)
+            // 1) Safe area
+            let safeW = max(geo.size.width,  1)
             let safeH = max(geo.size.height, 1)
 
-            // MAIN OVERALL BOUNDING BOX size (percent of safe area)
-            let overallW = safeW * (overallWidthPercent  / 100)
-            let overallH = safeH * (overallHeightPercent / 100)
+            // 2) Overall working box (percent of safe area)
+            let overallW = safeW * (layout.overallWidthPercent  / 100)
+            let overallH = safeH * (layout.overallHeightPercent / 100)
 
-            // Inner working area for the two tables
-            let innerPad = overallInnerPadding
-            let usableW = max(overallW - innerPad * 2, 1)
-            let usableH = max(overallH - innerPad * 2, 1)
+            // 3) Inner content area
+            let innerPad = layout.overallInnerPadding
+            let innerW = max(overallW - innerPad * 2, 1)
+            let innerH = max(overallH - innerPad * 2, 1)
 
-            // Percent-based target sizes for each table
-            let leftW  = usableW * (leftTableWidthAsPercent  / 100)
-            let rightW = usableW * (rightTableWidthAsPercent / 100)
-            let leftH  = usableH * (leftTableHeightAsPercent / 100)
-            let rightH = usableH * (rightTableHeightAsPercent / 100)
+            // 4) Table widths & heights (all percent-driven)
+            let leftW   = innerW * (layout.leftTableWidthAsPercent   / 100)
+            let gapW    = innerW * (layout.gapBetweenTablesAsPercent / 100)
+            let rightW  = innerW * (layout.rightTableWidthAsPercent  / 100)
 
-            // Design (unscaled) sizes
-            let leftDesignW:  CGFloat = leftTotalWidth
-            let rightDesignW: CGFloat = rightTotalWidth
-            let leftDesignH:  CGFloat = (40 + rowH*2)
-            let rightDesignH: CGFloat = (40 + 56*2)
+            let tablesH = innerH * (layout.tablesHeightPercent / 100)
 
-            // Scale to fit percent boxes
-            let leftScale  = min(leftW / leftDesignW,   leftH / leftDesignH)
-            let rightScale = min(rightW / rightDesignW, rightH / rightDesignH)
-
-            // Gap between the two tables
-            let gap: CGFloat = 6
+            // 5) Per-table metrics
+            let L = LeftMetrics(leftWidth: leftW, leftHeight: tablesH)
+            let R = RightMetrics(rightWidth: rightW, rightHeight: tablesH, pairedWith: L.rowH)
 
             ZStack {
-                Color(.systemBackground) // page bg
+                Color(.systemBackground)
 
-                // MAIN OVERALL BOUNDING BOX (shows the total space you're allocating)
+                // Outer box to visualize the total working area
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(.systemGray6)) // light background
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 14).fill(Color(.systemGray6))
+                    RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.5), lineWidth: 1)
 
-                    VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Card Game Scoresheet")
                             .font(.title.bold())
-                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                        // Tables region
-                        HStack(alignment: .top, spacing: gap) {
-                            // LEFT TABLE
-                            playerInfoTable
-                                .frame(width: leftDesignW, height: leftDesignH, alignment: .topLeading)
-                                .scaleEffect(leftScale, anchor: .topLeading)
-                                .frame(width: leftW, height: leftH, alignment: .topLeading)
-                                .clipped()
+                        HStack(alignment: .top, spacing: gapW) {
+                            playerInfoTable(L: L)
+                                .frame(width: leftW,  height: tablesH, alignment: .topLeading)
 
-                            // RIGHT TABLE
-                            teamScoresTable
-                                .frame(width: rightDesignW, height: rightDesignH, alignment: .topLeading)
-                                .scaleEffect(rightScale, anchor: .topLeading)
-                                .frame(width: rightW, height: rightH, alignment: .topLeading)
-                                .clipped()
+                            teamScoresTable(R: R)
+                                .frame(width: rightW, height: tablesH, alignment: .topLeading)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 0)
-                        .padding(.bottom, 4)
                     }
                     .padding(innerPad)
                 }
-                // Place the big box centered in the safe area (or change to .topLeading if you prefer)
-                .frame(width: overallW, height: overallH, alignment: .center)
+                .frame(width: overallW, height: overallH)
             }
-            .frame(width: safeW, height: safeH, alignment: .center)
+            .frame(width: safeW, height: safeH)
         }
     }
 
+    // MARK: - Left Table
 
-
-
-    // MARK: - Left: Player Information Table
-
-    private var playerInfoTable: some View {
+    private func playerInfoTable(L: LeftMetrics) -> some View {
         VStack(spacing: 0) {
-            // Header: Team Member | Spades | Hearts
+            // Header: TEAM MEMBER | SPADES(3) | HEARTS(3)
             HStack(spacing: 0) {
-                Cell(width: wName, height: rowH) {
-                    AutoFitText(text: "TEAM\nMEMBER", lines: 2, minScale: 1, fixedPointSize: headerPointSize)
+                Cell(width: L.wName, height: L.rowH) {
+                    AutoFitText(text: "TEAM\nMEMBER", lines: 2, minScale: 1, fixedPointSize: L.headerPointSize)
                 }
-                Cell(width: wNarrow*2, height: rowH) {
-                    AutoFitText(text: "SPADES", lines: 1, minScale: 1, fixedPointSize: headerPointSize)
+                Cell(width: L.wNarrow * 3, height: L.rowH) {
+                    AutoFitText(text: "SPADES", lines: 1, minScale: 1, fixedPointSize: L.headerPointSize)
                 }
-                Cell(width: wNarrow*3, height: rowH) {
-                    AutoFitText(text: "HEARTS", lines: 1, minScale: 1, fixedPointSize: headerPointSize)
+                Cell(width: L.wHearts * 3, height: L.rowH) {
+                    AutoFitText(text: "HEARTS", lines: 1, minScale: 1, fixedPointSize: L.headerPointSize)
                 }
             }
 
             ForEach($teams) { $team in
-                // First row (labels line) matching your React layout
+                // Labels row
                 HStack(spacing: 0) {
-                    Cell(width: wName, height: rowH, alignment: .leading) {
+                    Cell(width: L.wName, height: L.rowH, alignment: .leading) {
                         TextField("Name", text: $team.players[0].name)
-                            .textFieldStyle(.plain)
-                            .font(.subheadline)
+                            .textFieldStyle(.plain).font(.subheadline)
                     }
-                    // bid/took label
-                    Cell(width: wNarrow, height: rowH) { Text("bid/took").font(.caption).foregroundStyle(.secondary) }
-                    // bid picker
-                    Cell(width: wNarrow, height: rowH) {
+                    Cell(width: L.wNarrow, height: L.rowH) { Text("bid/took").font(.caption).foregroundStyle(.secondary) }
+                    Cell(width: L.wNarrow, height: L.rowH) {
                         Picker("", selection: $team.players[0].bid) {
                             ForEach(nums, id: \.self) { Text("\($0)").tag($0) }
-                        }.pickerStyle(.menu)  // menu style like a dropdown  :contentReference[oaicite:3]{index=3}
+                        }.pickerStyle(.menu)
                     }
-                    // took picker
-                    Cell(width: wNarrow, height: rowH) {
+                    Cell(width: L.wNarrow, height: L.rowH) {
                         Picker("", selection: $team.players[0].took) {
                             ForEach(nums, id: \.self) { Text("\($0)").tag($0) }
                         }.pickerStyle(.menu)
                     }
-                    // "hearts" label
-                    Cell(width: wHearts, height: rowH) { Text("hearts").font(.caption).foregroundStyle(.secondary) }
-                    // "queen" label
-                    Cell(width: wHearts, height: rowH) { Text("queen").font(.caption).foregroundStyle(.secondary) }
-                    // "moon" label
-                    Cell(width: wHearts, height: rowH) { Text("moon").font(.caption).foregroundStyle(.secondary) }
+                    Cell(width: L.wHearts, height: L.rowH) { Text("hearts").font(.caption).foregroundStyle(.secondary) }
+                    Cell(width: L.wHearts, height: L.rowH) { Text("queen").font(.caption).foregroundStyle(.secondary) }
+                    Cell(width: L.wHearts, height: L.rowH) { Text("moon").font(.caption).foregroundStyle(.secondary) }
                 }
 
-                // Second row (inputs line)
+                // Inputs row
                 HStack(spacing: 0) {
-                    Cell(width: wName, height: rowH, alignment: .leading) {
+                    Cell(width: L.wName, height: L.rowH, alignment: .leading) {
                         TextField("Name", text: $team.players[1].name)
-                            .textFieldStyle(.plain)
-                            .font(.subheadline)
+                            .textFieldStyle(.plain).font(.subheadline)
                     }
-                    // bid/took label
-                    Cell(width: wNarrow, height: rowH) { Text("bid/took").font(.caption).foregroundStyle(.secondary) }
-                    // bid picker
-                    Cell(width: wNarrow, height: rowH) {
+                    Cell(width: L.wNarrow, height: L.rowH) { Text("bid/took").font(.caption).foregroundStyle(.secondary) }
+                    Cell(width: L.wNarrow, height: L.rowH) {
                         Picker("", selection: $team.players[1].bid) {
                             ForEach(nums, id: \.self) { Text("\($0)").tag($0) }
                         }.pickerStyle(.menu)
                     }
-                    // took picker
-                    Cell(width: wNarrow, height: rowH) {
+                    Cell(width: L.wNarrow, height: L.rowH) {
                         Picker("", selection: $team.players[1].took) {
                             ForEach(nums, id: \.self) { Text("\($0)").tag($0) }
                         }.pickerStyle(.menu)
                     }
-                    // hearts numeric (team-level in your RN code)
-                    Cell(width: wHearts, height: rowH) {
+                    Cell(width: L.wHearts, height: L.rowH) {
                         Picker("", selection: $team.data.hearts) {
                             ForEach(nums, id: \.self) { Text("\($0)").tag($0) }
                         }.pickerStyle(.menu)
                     }
-                    // queen checkbox
-                    Cell(width: wHearts, height: rowH) {
-                        CheckBox(isOn: $team.data.queensSpades)
-                    }
-
-                    // moon checkbox (explicit column)
-                    Cell(width: wHearts, height: rowH) {
-                        CheckBox(isOn: $team.data.moonShot)
-                    }
+                    Cell(width: L.wHearts, height: L.rowH) { CheckBox(isOn: $team.data.queensSpades) }
+                    Cell(width: L.wHearts, height: L.rowH) { CheckBox(isOn: $team.data.moonShot) }
                 }
             }
         }
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.6), lineWidth: 1))
     }
 
-    // MARK: - Right: Team Scores Table
+    // MARK: - Right Table
 
-    private var teamScoresTable: some View {
+    private func teamScoresTable(R: RightMetrics) -> some View {
         VStack(spacing: 0) {
-            // Header row
             HStack(spacing: 0) {
-                Cell(width: wTeam,  height: rowH) { AutoFitText(text: "TEAM",          lines: 1, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Spades\nScore",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hearts\nScore",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hand\nScore",    lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hand\nBags",     lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "All\nBags",      lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Spades\nTotal",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Hearts\nTotal",  lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-                Cell(width: wScore, height: rowH) { AutoFitText(text: "Game\nTotal",    lines: 2, minScale: 1, fixedPointSize: headerPointSize) }
-
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Spades\nScore", lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Hearts\nScore", lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Hand\nScore",   lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Hand\nBags",    lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "All\nBags",     lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Spades\nTotal", lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Hearts\nTotal", lines: 2, minScale: 1) }
+                Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Game\nTotal",   lines: 2, minScale: 1) }
             }
 
             ForEach($teams) { $team in
                 HStack(spacing: 0) {
-                    // Team name + players list
-                    Cell(width: wTeam, height: rightRowH, alignment: .leading) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(team.data.name).font(.subheadline.weight(.semibold))
-                            Text("\(team.players[0].name) + \(team.players[1].name)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    Cell(width: R.wScore, height: R.rowHData) { numberField($team.data.spadesScore, cellHeight: R.rowHData) }
+                    Cell(width: R.wScore, height: R.rowHData) { numberField($team.data.heartsScore, cellHeight: R.rowHData) }
+                    Cell(width: R.wScore, height: R.rowHData) { numberField($team.data.handScore,  cellHeight: R.rowHData) }
+                    Cell(width: R.wScore, height: R.rowHData) { numberField($team.data.handBags,   cellHeight: R.rowHData) }
+                    Cell(width: R.wScore, height: R.rowHData) { numberField($team.data.allBags,    cellHeight: R.rowHData) }
 
-                    // Editable numeric TextFields for scores/bags
-                    Cell(width: wScore, height: rightRowH) { numberField($team.data.spadesScore) }
-                    Cell(width: wScore, height: rightRowH) { numberField($team.data.heartsScore) }
-                    Cell(width: wScore, height: rightRowH) { numberField($team.data.handScore)  }
-                    Cell(width: wScore, height: rightRowH) { numberField($team.data.handBags)   }
-                    Cell(width: wScore, height: rightRowH) { numberField($team.data.allBags)    }
-
-                    // Totals as large labels (read-only styling for now)
-                    Cell(width: wScore, height: rightRowH) {
-                        AutoFitText(text: "\(team.data.spadesTotal)", weight: .bold, lines: 1, minScale: 1, fixedPointSize: totalsPointSize)
-                    }
-                    Cell(width: wScore, height: rightRowH) {
-                        AutoFitText(text: "\(team.data.heartsTotal)", weight: .bold, lines: 1, minScale: 1, fixedPointSize: totalsPointSize)
-                    }
-                    Cell(width: wScore, height: rightRowH) {
-                        AutoFitText(text: "\(team.data.gameTotal)",   weight: .bold, lines: 1, minScale: 1, fixedPointSize: totalsPointSize)
-                    }
+                    Cell(width: R.wScore, height: R.rowHData) { AutoFitText(text: "\(team.data.spadesTotal)", weight: .bold, lines: 1, minScale: 1, fixedPointSize: R.totalsPointSize) }
+                    Cell(width: R.wScore, height: R.rowHData) { AutoFitText(text: "\(team.data.heartsTotal)", weight: .bold, lines: 1, minScale: 1, fixedPointSize: R.totalsPointSize) }
+                    Cell(width: R.wScore, height: R.rowHData) { AutoFitText(text: "\(team.data.gameTotal)",   weight: .bold, lines: 1, minScale: 1, fixedPointSize: R.totalsPointSize) }
                 }
             }
         }
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.6), lineWidth: 1))
     }
 
-    // MARK: - Small helpers
+    // MARK: - Small helper
 
-    private func numberField(_ binding: Binding<Int>) -> some View {
-        // Bind Int directly using the value-based TextField initializer.  :contentReference[oaicite:5]{index=5}
+    private func numberField(_ binding: Binding<Int>, cellHeight: CGFloat) -> some View {
         TextField("", value: binding, format: .number)
-            .textFieldStyle(.roundedBorder)  // visual affordance  :contentReference[oaicite:6]{index=6}
-            .frame(width: 44)
+            .textFieldStyle(.roundedBorder)
+            .font(.system(size: cellHeight * 0.35))   // scales with cell height
+            .frame(width: 48)
             .multilineTextAlignment(.center)
             .monospacedDigit()
             .keyboardType(.numberPad)
@@ -424,6 +358,4 @@ struct RNPort_SpartsView: View {
 
 // MARK: - Preview
 
-#Preview {
-    RNPort_SpartsView()
-}
+#Preview { RNPort_SpartsView() }
