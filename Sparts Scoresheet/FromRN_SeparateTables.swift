@@ -258,6 +258,9 @@ struct FromRN_SeparateTables: View {
                 }
             }
 
+            // >>> Minimal change: gap between header and data rows <<<
+            Color.clear.frame(height: 6)
+
             ForEach($teams) { $team in
                 // Labels row
                 HStack(spacing: 0) {
@@ -325,6 +328,9 @@ struct FromRN_SeparateTables: View {
                 Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Hearts\nTotal", lines: 2, minScale: 1) }
                 Cell(width: R.wScore, height: R.rowHHeader) { AutoFitText(text: "Game\nTotal",   lines: 2, minScale: 1) }
             }
+
+            // >>> Minimal change: gap between header and data rows <<<
+            Color.clear.frame(height: 6)
 
             ForEach($teams) { $team in
                 HStack(spacing: 0) {
