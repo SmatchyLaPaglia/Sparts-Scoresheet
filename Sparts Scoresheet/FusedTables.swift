@@ -1,37 +1,5 @@
 import SwiftUI
 
-// MARK: - Models
-
-struct Player: Identifiable, Hashable {
-    let id: Int
-    var name: String
-    var bid: Int
-    var took: Int
-    var spades: Int
-}
-
-struct TeamData: Identifiable, Hashable {
-    let id: Int
-    var name: String
-    var hearts: Int
-    var queensSpades: Bool
-    var moonShot: Bool
-    var spadesScore: Int
-    var heartsScore: Int
-    var handScore: Int
-    var handBags: Int
-    var allBags: Int
-    var spadesTotal: Int
-    var heartsTotal: Int
-    var gameTotal: Int
-}
-
-struct Team: Identifiable, Hashable {
-    let id: Int
-    var players: [Player]
-    var data: TeamData
-}
-
 // MARK: - Small UI Helpers
 
 private struct Cell: View {
@@ -70,34 +38,6 @@ private struct CheckBox: View {
     }
 }
 
-struct AutoFitText: View {
-    let text: String
-    var weight: Font.Weight = .semibold
-    var design: Font.Design = .default
-    var alignment: TextAlignment = .center
-    var lines: Int = 1
-    var padding: CGFloat = 0
-    var minScale: CGFloat = 0.7
-    var baselineFactor: CGFloat = 0.84
-    var fixedPointSize: CGFloat? = nil
-
-    var body: some View {
-        GeometryReader { geo in
-            let size: CGFloat = {
-                if let fixed = fixedPointSize { return fixed }
-                let perLine = max((geo.size.height - padding * 2) / CGFloat(max(lines,1)), 1)
-                return perLine * baselineFactor
-            }()
-            Text(text)
-                .font(.system(size: size, weight: weight, design: design))
-                .multilineTextAlignment(alignment)
-                .lineLimit(lines)
-                .minimumScaleFactor(minScale)
-                .frame(width: geo.size.width, height: geo.size.height)
-                .padding(.horizontal, padding)
-        }
-    }
-}
 
 // MARK: - Percent-Driven Layout
 
@@ -157,9 +97,7 @@ private struct RightMetrics {
 
 // MARK: - Main View
 
-import SwiftUI
-
-struct RNPort_SpartsView: View {
+struct FusedTables: View {
     // --- Data (same as before) ---
     @State private var teams: [Team] = [
         Team(
@@ -417,9 +355,5 @@ struct RNPort_SpartsView: View {
 }
 
 // MARK: - Preview
-#Preview { RNPort_SpartsView() }
+#Preview { FusedTables() }
 
-
-// MARK: - Preview
-
-#Preview { RNPort_SpartsView() }
