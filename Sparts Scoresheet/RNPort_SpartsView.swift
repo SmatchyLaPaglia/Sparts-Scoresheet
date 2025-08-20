@@ -57,6 +57,23 @@ private struct Cell: View {
     }
 }
 
+// iOS-friendly checkbox using SF Symbols; no Toggle needed.
+private struct CheckBox: View {
+    @Binding var isOn: Bool
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            Image(systemName: isOn ? "checkmark.square.fill" : "square")
+                .imageScale(.medium)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Checkbox")
+        .accessibilityValue(isOn ? "Checked" : "Unchecked")
+    }
+}
+
+
 // MARK: - AutoFitText (with optional fixed size)
 // If fixedPointSize is provided, that exact size is used (uniform across siblings).
 // Otherwise it derives size from the view's height and number of lines.
@@ -134,6 +151,13 @@ struct RNPort_SpartsView: View {
     private let wNarrow: CGFloat = 80
     private let wHearts: CGFloat = 80  // numeric cell within "Hearts" column
     private let rowH: CGFloat    = 40
+    
+    // Right table rows should align to two left rows (labels + inputs)
+    private let rightRowH: CGFloat = 2 * 40
+
+    // Smaller, uniform totals font (independent of the taller right rows)
+    private var totalsPointSize: CGFloat { rowH * 0.95 }
+
 
     // Right table widths
     private let wTeam: CGFloat   = 100
@@ -319,11 +343,12 @@ struct RNPort_SpartsView: View {
                     }
                     // queen checkbox
                     Cell(width: wHearts, height: rowH) {
-                        Toggle("", isOn: $team.data.queensSpades).labelsHidden() //  :contentReference[oaicite:4]{index=4}
+                        CheckBox(isOn: $team.data.queensSpades)
                     }
-                    // moon checkbox (you can make these mutually exclusive across teams later)
+
+                    // moon checkbox (explicit column)
                     Cell(width: wHearts, height: rowH) {
-                        Toggle("", isOn: $team.data.moonShot).labelsHidden()
+                        CheckBox(isOn: $team.data.moonShot)
                     }
                 }
             }
@@ -352,7 +377,7 @@ struct RNPort_SpartsView: View {
             ForEach($teams) { $team in
                 HStack(spacing: 0) {
                     // Team name + players list
-                    Cell(width: wTeam, height: 56, alignment: .leading) {
+                    Cell(width: wTeam, height: rightRowH, alignment: .leading) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(team.data.name).font(.subheadline.weight(.semibold))
                             Text("\(team.players[0].name) + \(team.players[1].name)")
@@ -362,16 +387,22 @@ struct RNPort_SpartsView: View {
                     }
 
                     // Editable numeric TextFields for scores/bags
-                    Cell(width: wScore, height: 56) { numberField($team.data.spadesScore) }
-                    Cell(width: wScore, height: 56) { numberField($team.data.heartsScore) }
-                    Cell(width: wScore, height: 56) { numberField($team.data.handScore)  }
-                    Cell(width: wScore, height: 56) { numberField($team.data.handBags)   }
-                    Cell(width: wScore, height: 56) { numberField($team.data.allBags)    }
+                    Cell(width: wScore, height: rightRowH) { numberField($team.data.spadesScore) }
+                    Cell(width: wScore, height: rightRowH) { numberField($team.data.heartsScore) }
+                    Cell(width: wScore, height: rightRowH) { numberField($team.data.handScore)  }
+                    Cell(width: wScore, height: rightRowH) { numberField($team.data.handBags)   }
+                    Cell(width: wScore, height: rightRowH) { numberField($team.data.allBags)    }
 
                     // Totals as large labels (read-only styling for now)
-                    Cell(width: wScore, height: 56) { AutoFitText(text: "\(team.data.spadesTotal)", weight: .bold, lines: 1, minScale: 0.6) }
-                    Cell(width: wScore, height: 56) { AutoFitText(text: "\(team.data.heartsTotal)", weight: .bold, lines: 1, minScale: 0.6) }
-                    Cell(width: wScore, height: 56) { AutoFitText(text: "\(team.data.gameTotal)",   weight: .bold, lines: 1, minScale: 0.6) }
+                    Cell(width: wScore, height: rightRowH) {
+                        AutoFitText(text: "\(team.data.spadesTotal)", weight: .bold, lines: 1, minScale: 1, fixedPointSize: totalsPointSize)
+                    }
+                    Cell(width: wScore, height: rightRowH) {
+                        AutoFitText(text: "\(team.data.heartsTotal)", weight: .bold, lines: 1, minScale: 1, fixedPointSize: totalsPointSize)
+                    }
+                    Cell(width: wScore, height: rightRowH) {
+                        AutoFitText(text: "\(team.data.gameTotal)",   weight: .bold, lines: 1, minScale: 1, fixedPointSize: totalsPointSize)
+                    }
                 }
             }
         }
