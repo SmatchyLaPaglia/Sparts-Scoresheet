@@ -17,8 +17,8 @@ enum Theme {
     static let textDisabled    = Color.gray.opacity(0.6)
     static let textAccentBlue  = Color(red: 0.24, green: 0.63, blue: 1.0)
 
-//    static let leftHeaderBg    = Color(red: 0.215, green: 0.215, blue: 0.215)
-    static let leftHeaderBg    = Color(red: 0.415, green: 0.515, blue: 0.415)
+    static let leftHeaderBg    = Color(red: 0.215, green: 0.215, blue: 0.215)
+//    static let leftHeaderBg    = Color(red: 0.415, green: 0.515, blue: 0.415)
 
     static let leftHeaderText  = Color.orange
 
