@@ -30,89 +30,93 @@ struct NotchSafeScoreTable: View {
     ]
 
     var body: some View {
-        NotchSafeView(
-            heightPercent: heightPercent,
-            paddingPercentNotchSide: 1.25,
-            paddingPercentSideOppositeNotch: 0.25
-        ) { rect in
-
-            let safeCols  = max(columns, 1)
-            let safeRows  = max(rows, 1)
-
-            // Gap height is based on *screen* height, not table height
-            let screenH   = UIScreen.main.bounds.height
-            let gapH      = screenH * (rowSeparatorSizeAsPercentOfScreenHeight / 100)
-
-            // Build row rects (top→bottom) with requested gaps between rows
-            let rowRects  = NotchSafeScoreTable.buildRowRects(
-                tableSize: rect.size,
-                rows: safeRows,
-                gapAfterRows: gapAfterRows,
-                gapH: gapH
-            )
-
-            ZStack {
-                // One stack per row so we can clip fills + lines to rounded ends
-                ForEach(0..<rowRects.count, id: \.self) { idx in
-                    let r = rowRects[idx]
-                    let rowNumber = idx + 1               // 1-based
-                    let colW = r.width / CGFloat(safeCols)
-
-                    ZStack {
-                        // === BACKGROUND FILLS (rounded via clip on container) ===
-                        if rowNumber == 1 {
-                            // Header is a single band (can also be overridden per-cell if desired)
-                            Rectangle()
-                                .fill(Theme.leftHeaderBg)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            // Draw each column’s background for this row
-                            ForEach(1...safeCols, id: \.self) { col in
-                                let color = colorForCell(row: rowNumber, col: col, totalCols: safeCols)
-                                if let color {
-                                    Rectangle()
-                                        .fill(color)
-                                        .frame(width: colW, height: r.height)
-                                        .position(x: (CGFloat(col) - 0.5) * colW, y: r.height / 2)
+        ZStack{
+            Color.orange
+            NotchSafeView(
+                heightPercent: heightPercent,
+                paddingPercentNotchSide: 1.25,
+                paddingPercentSideOppositeNotch: 0.25
+            ) { rect in
+                
+                let safeCols  = max(columns, 1)
+                let safeRows  = max(rows, 1)
+                
+                // Gap height is based on *screen* height, not table height
+                let screenH   = UIScreen.main.bounds.height
+                let gapH      = screenH * (rowSeparatorSizeAsPercentOfScreenHeight / 100)
+                
+                // Build row rects (top→bottom) with requested gaps between rows
+                let rowRects  = NotchSafeScoreTable.buildRowRects(
+                    tableSize: rect.size,
+                    rows: safeRows,
+                    gapAfterRows: gapAfterRows,
+                    gapH: gapH
+                )
+                
+                ZStack {
+                    // One stack per row so we can clip fills + lines to rounded ends
+                    ForEach(0..<rowRects.count, id: \.self) { idx in
+                        let r = rowRects[idx]
+                        let rowNumber = idx + 1               // 1-based
+                        let colW = r.width / CGFloat(safeCols)
+                        
+                        ZStack {
+                            // === BACKGROUND FILLS (rounded via clip on container) ===
+                            if rowNumber == 1 {
+                                // Header is a single band (can also be overridden per-cell if desired)
+                                Rectangle()
+                                    .fill(Theme.leftHeaderBg)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                // Draw each column’s background for this row
+                                ForEach(1...safeCols, id: \.self) { col in
+                                    let color = colorForCell(row: rowNumber, col: col, totalCols: safeCols)
+                                    if let color {
+                                        Rectangle()
+                                            .fill(color)
+                                            .frame(width: colW, height: r.height)
+                                            .position(x: (CGFloat(col) - 0.5) * colW, y: r.height / 2)
+                                    }
                                 }
                             }
-                        }
-
-                        // === VERTICAL LINES for THIS ROW (masked to the rounded shape) ===
-                        Path { p in
-                            if rowNumber == 1 {
-                                // Header: cuts only at merge boundaries
-                                let cuts = [3, 6, 9, 12, 15]
-                                for i in cuts where i < safeCols {
-                                    let x = CGFloat(i) * colW
-                                    p.move(to: CGPoint(x: x, y: 0))
-                                    p.addLine(to: CGPoint(x: x, y: r.height))
-                                }
-                            } else {
-                                // Body: merge 1–3 (skip lines at 1 & 2)
-                                if safeCols > 1 {
-                                    for i in 1..<safeCols where i != 1 && i != 2 {
+                            
+                            // === VERTICAL LINES for THIS ROW (masked to the rounded shape) ===
+                            Path { p in
+                                if rowNumber == 1 {
+                                    // Header: cuts only at merge boundaries
+                                    let cuts = [3, 6, 9, 12, 15]
+                                    for i in cuts where i < safeCols {
                                         let x = CGFloat(i) * colW
                                         p.move(to: CGPoint(x: x, y: 0))
                                         p.addLine(to: CGPoint(x: x, y: r.height))
                                     }
+                                } else {
+                                    // Body: merge 1–3 (skip lines at 1 & 2)
+                                    if safeCols > 1 {
+                                        for i in 1..<safeCols where i != 1 && i != 2 {
+                                            let x = CGFloat(i) * colW
+                                            p.move(to: CGPoint(x: x, y: 0))
+                                            p.addLine(to: CGPoint(x: x, y: r.height))
+                                        }
+                                    }
                                 }
                             }
+                            .stroke(Theme.gridLine, lineWidth: 1)
                         }
-                        .stroke(Theme.gridLine, lineWidth: 1)
+                        // Clip ENTIRE row stack (fills + lines) to rounded ends
+                        .clipShape(RoundedRectangle(cornerRadius: rowCornerRadius))
+                        // Rounded outline drawn on top; strokeBorder keeps it inside the clip
+                        .overlay(
+                            RoundedRectangle(cornerRadius: rowCornerRadius)
+                                .strokeBorder(Theme.gridLine, lineWidth: 1)
+                        )
+                        .frame(width: r.width, height: r.height)
+                        .position(x: r.midX, y: r.midY)
                     }
-                    // Clip ENTIRE row stack (fills + lines) to rounded ends
-                    .clipShape(RoundedRectangle(cornerRadius: rowCornerRadius))
-                    // Rounded outline drawn on top; strokeBorder keeps it inside the clip
-                    .overlay(
-                        RoundedRectangle(cornerRadius: rowCornerRadius)
-                            .strokeBorder(Theme.gridLine, lineWidth: 1)
-                    )
-                    .frame(width: r.width, height: r.height)
-                    .position(x: r.midX, y: r.midY)
                 }
             }
         }
+        .ignoresSafeArea(.all)
     }
 
     // MARK: - Default color scheme + overrides
