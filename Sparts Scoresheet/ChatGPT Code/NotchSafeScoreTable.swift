@@ -31,7 +31,7 @@ struct NotchSafeScoreTable: View {
 
     var body: some View {
         ZStack{
-            Color.orange
+            Color.gray
             NotchSafeView(
                 heightPercent: heightPercent,
                 paddingPercentNotchSide: 1.25,
@@ -52,6 +52,12 @@ struct NotchSafeScoreTable: View {
                     gapAfterRows: gapAfterRows,
                     gapH: gapH
                 )
+                
+                let layout = ScoreTableLayout(tableRect: rect,
+                                              rows: safeRows,
+                                              cols: safeCols,
+                                              rowRects: rowRects,
+                                              colWidth: rect.width / CGFloat(safeCols))
                 
                 ZStack {
                     // One stack per row so we can clip fills + lines to rounded ends
@@ -114,6 +120,7 @@ struct NotchSafeScoreTable: View {
                         .position(x: r.midX, y: r.midY)
                     }
                 }
+                .preference(key: ScoreTableLayoutKey.self, value: layout)
             }
         }
         .ignoresSafeArea(.all)
