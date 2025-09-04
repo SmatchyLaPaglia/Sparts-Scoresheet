@@ -7,27 +7,35 @@ import SwiftUI
 
 struct NotchSafeScoreTable: View {
     // Table size inside the notch-safe span
-    var heightPercent: CGFloat = 80
+    var heightPercent: CGFloat = 55
     // Grid shape
     var columns: Int = 16
     var rows: Int = 5
 
     // Rounded row ends (left & right corners per row)
-    var rowCornerRadius: CGFloat = 14
+    var rowCornerRadius: CGFloat = 7
 
     // Gaps that show the phone background between rows (1-based indices)
     var gapAfterRows: [Int] = [1, 3]
     // Gap size relative to screen height
     var rowSeparatorSizeAsPercentOfScreenHeight: CGFloat = 2
 
+    // --- NEW: manual color control (1-based row & col) ---
+    // Example below in Preview overrides rows 3 & 5, cols 5–7 → nameStripeDark
+    var cellOverrides: [Int: [Int: Color]] = [
+        3: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark, 8: Theme.nameStripeDark,
+            9: Theme.nameStripeDark],
+        5: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark, 8: Theme.nameStripeDark,
+            9: Theme.nameStripeDark]
+    ]
+
     var body: some View {
         NotchSafeView(
             heightPercent: heightPercent,
-            paddingPercentNotchSide: 2,
-            paddingPercentSideOppositeNotch: 1
+            paddingPercentNotchSide: 1.25,
+            paddingPercentSideOppositeNotch: 0.25
         ) { rect in
 
-            // --- Metrics (no control-flow at view level) ---
             let safeCols  = max(columns, 1)
             let safeRows  = max(rows, 1)
 
@@ -47,77 +55,26 @@ struct NotchSafeScoreTable: View {
                 // One stack per row so we can clip fills + lines to rounded ends
                 ForEach(0..<rowRects.count, id: \.self) { idx in
                     let r = rowRects[idx]
-                    let rowNumber = idx + 1
+                    let rowNumber = idx + 1               // 1-based
                     let colW = r.width / CGFloat(safeCols)
 
                     ZStack {
                         // === BACKGROUND FILLS (rounded via clip on container) ===
                         if rowNumber == 1 {
-                            // Header is a single band
-                            RoundedRectangle(cornerRadius: 0) // local shape, no extra rounding
+                            // Header is a single band (can also be overridden per-cell if desired)
+                            Rectangle()
                                 .fill(Theme.leftHeaderBg)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
-                            // Body cell backgrounds in local coords [0..r.width]
-                            // 1) Name stripe (merged 1–3), alternating light/dark
-                            let nameColor = (rowNumber % 2 == 0) ? Theme.nameStripeDark : Theme.nameStripeLight
-                            Rectangle()
-                                .fill(nameColor)
-                                .frame(width: colW * 3, height: r.height)
-                                .position(x: colW * 1.5, y: r.height / 2)
-
-                            // 2) bid/took (col 4)
-                            Rectangle()
-                                .fill(Theme.leftHeaderBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 3.5, y: r.height / 2)
-
-                            // 3) spades bid/took (cols 5–6) – white
-                            Rectangle().fill(Theme.cellBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 4.5, y: r.height / 2)
-                            Rectangle().fill(Theme.cellBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 5.5, y: r.height / 2)
-
-                            // 4) hearts / queen / moon (cols 7–9) – dark mini headers
-                            Rectangle().fill(Theme.leftHeaderBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 6.5, y: r.height / 2)
-                            Rectangle().fill(Theme.leftHeaderBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 7.5, y: r.height / 2)
-                            Rectangle().fill(Theme.leftHeaderBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 8.5, y: r.height / 2)
-
-                            // 5) HAND SCORES (cols 10–12)
-                            Rectangle().fill(Theme.rightSpadesScoreBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 9.5, y: r.height / 2)
-                            Rectangle().fill(Theme.rightHeartsScoreBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 10.5, y: r.height / 2)
-                            Rectangle().fill(Theme.rightHandScoreBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 11.5, y: r.height / 2)
-
-                            // 6) TOTAL SCORES (cols 13–15)
-                            Rectangle().fill(Theme.rightSpadesTotalBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 12.5, y: r.height / 2)
-                            Rectangle().fill(Theme.rightHeartsTotalBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 13.5, y: r.height / 2)
-                            Rectangle().fill(Theme.rightAllBagsBg)
-                                .frame(width: colW, height: r.height)
-                                .position(x: colW * 14.5, y: r.height / 2)
-
-                            // 7) GRAND TOTAL (col 16)
-                            if safeCols >= 16 {
-                                Rectangle().fill(Theme.rightGameTotalBg)
-                                    .frame(width: colW, height: r.height)
-                                    .position(x: colW * 15.5, y: r.height / 2)
+                            // Draw each column’s background for this row
+                            ForEach(1...safeCols, id: \.self) { col in
+                                let color = colorForCell(row: rowNumber, col: col, totalCols: safeCols)
+                                if let color {
+                                    Rectangle()
+                                        .fill(color)
+                                        .frame(width: colW, height: r.height)
+                                        .position(x: (CGFloat(col) - 0.5) * colW, y: r.height / 2)
+                                }
                             }
                         }
 
@@ -132,7 +89,7 @@ struct NotchSafeScoreTable: View {
                                     p.addLine(to: CGPoint(x: x, y: r.height))
                                 }
                             } else {
-                                // Body: merge 1–3 (skip 1 & 2)
+                                // Body: merge 1–3 (skip lines at 1 & 2)
                                 if safeCols > 1 {
                                     for i in 1..<safeCols where i != 1 && i != 2 {
                                         let x = CGFloat(i) * colW
@@ -155,6 +112,62 @@ struct NotchSafeScoreTable: View {
                     .position(x: r.midX, y: r.midY)
                 }
             }
+        }
+    }
+
+    // MARK: - Default color scheme + overrides
+
+    /// Returns the background color for a cell (1-based row/col) if any.
+    /// Checks overrides first, then falls back to a default scheme.
+    private func colorForCell(row: Int, col: Int, totalCols: Int) -> Color? {
+        // 1) Explicit overrides win
+        if let rowMap = cellOverrides[row], let override = rowMap[col] {
+            return override
+        }
+
+        // 2) Default scheme
+        if row == 1 {
+            // Header band (can still be overridden per cell)
+            return Theme.leftHeaderBg
+        }
+
+        // Body rows default:
+        //  - Cols 1–3: alternating name stripe
+        //  - Col 4: leftHeaderBg
+        //  - Cols 5–6: white
+        //  - Cols 7–9: leftHeaderBg
+        //  - 10: rightSpadesScoreBg
+        //  - 11: rightHeartsScoreBg
+        //  - 12: rightHandScoreBg
+        //  - 13: rightSpadesTotalBg
+        //  - 14: rightHeartsTotalBg
+        //  - 15: rightAllBagsBg
+        //  - 16: rightGameTotalBg (if present)
+        switch col {
+        case 1...3:
+            return (row % 2 == 0) ? Theme.nameStripeDark : Theme.nameStripeLight
+        case 4:
+            return Theme.leftHeaderBg
+        case 5, 6:
+            return Theme.cellBg
+        case 7, 8, 9:
+            return Theme.leftHeaderBg
+        case 10:
+            return Theme.rightSpadesScoreBg
+        case 11:
+            return Theme.rightHeartsScoreBg
+        case 12:
+            return Theme.rightHandScoreBg
+        case 13:
+            return Theme.rightSpadesTotalBg
+        case 14:
+            return Theme.rightHeartsTotalBg
+        case 15:
+            return Theme.rightAllBagsBg
+        case 16 where totalCols >= 16:
+            return Theme.rightGameTotalBg
+        default:
+            return nil
         }
     }
 
@@ -184,5 +197,20 @@ struct NotchSafeScoreTable: View {
 
 // MARK: - Preview
 #Preview(traits: .landscapeLeft) {
-    NotchSafeScoreTable()
+    // Example manual overrides:
+    // Rows 3 and 5 → cols 5..7 set to nameStripeDark
+//    let overrides: [Int: [Int: Color]] = [
+//        3: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark],
+//        5: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark]
+//    ]
+
+    return NotchSafeScoreTable(
+        heightPercent: 55,
+        columns: 16,
+        rows: 5,
+        rowCornerRadius: 7,
+        gapAfterRows: [1, 3],
+        rowSeparatorSizeAsPercentOfScreenHeight: 2,
+//        cellOverrides: overrides
+    )
 }
