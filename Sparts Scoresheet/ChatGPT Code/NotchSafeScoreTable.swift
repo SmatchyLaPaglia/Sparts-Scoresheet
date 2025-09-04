@@ -6,89 +6,117 @@
 import SwiftUI
 
 struct NotchSafeScoreTable: View {
-    // You can tweak these; 100 means full height inside the safe span.
+    // Table size inside the notch-safe span
     var heightPercent: CGFloat = 60
+    // Grid shape
     var columns: Int = 16
     var rows: Int = 5
 
-    var body: some View {
-        NotchSafeView(heightPercent: heightPercent,
-                      paddingPercentNotchSide: 2,
-                      paddingPercentSideOppositeNotch: 1) { rect in
+    // NEW: gaps and size
+    var gapAfterRows: [Int] = [1, 3]                   // 1-based row indices with a gap after
+    var rowSeparatorSizeAsPercentOfScreenHeight: CGFloat = 2
 
-            // Precompute column/row sizes once
-            let colW = rect.width / CGFloat(max(columns, 1))
-            let rowH = rect.height / CGFloat(max(rows, 1))
+    var body: some View {
+        NotchSafeView(
+            heightPercent: heightPercent,
+            paddingPercentNotchSide: 2,
+            paddingPercentSideOppositeNotch: 1
+        ) { rect in
+
+            // --- Metrics (no control-flow at view level) ---
+            let safeCols  = max(columns, 1)
+            let safeRows  = max(rows, 1)
+            let colW      = rect.width / CGFloat(safeCols)
+
+            // Gap height is based on *screen* height, not table height
+            let screenH   = UIScreen.main.bounds.height
+            let gapH      = screenH * (rowSeparatorSizeAsPercentOfScreenHeight / 100)
+
+            // Build row rects (top→bottom) with requested gaps between rows
+            let rowRects  = NotchSafeScoreTable.buildRowRects(
+                tableSize: rect.size,
+                rows: safeRows,
+                gapAfterRows: gapAfterRows,
+                gapH: gapH
+            )
 
             ZStack {
-                // ===== Vertical dividers across whole table (unchanged) =====
+                // ===== Row borders (each row drawn independently) =====
                 Path { p in
-                    for i in 1..<columns {
+                    for r in rowRects { p.addRect(r) }
+                }
+                .stroke(Theme.gridLine, lineWidth: 1)
+
+                // ===== Vertical dividers, only inside row rects (skip the gaps) =====
+                Path { p in
+                    for i in 1..<safeCols {
                         let x = CGFloat(i) * colW
-                        p.move(to: CGPoint(x: x, y: 0))
-                        p.addLine(to: CGPoint(x: x, y: rect.height))
+                        for r in rowRects {
+                            p.move(to: CGPoint(x: x, y: r.minY))
+                            p.addLine(to: CGPoint(x: x, y: r.maxY))
+                        }
                     }
                 }
                 .stroke(Theme.gridLine, lineWidth: 1)
 
-                // ===== Horizontal dividers (explicit, not a loop) =====
-                // y positions of the boundaries below each row:
-                // 0 (top), rowH (after header), 2*rowH, 3*rowH (TEAM GAP), 4*rowH, 5*rowH (bottom)
-                // Regular lines:
-                Path { p in
-                    // after header
-                    p.move(to: CGPoint(x: 0, y: rowH))
-                    p.addLine(to: CGPoint(x: rect.width, y: rowH))
-                    // between team 1 players (rows 1 & 2)
-                    p.move(to: CGPoint(x: 0, y: rowH * 2))
-                    p.addLine(to: CGPoint(x: rect.width, y: rowH * 2))
-                    // between team 2 players (rows 3 & 4)
-                    p.move(to: CGPoint(x: 0, y: rowH * 4))
-                    p.addLine(to: CGPoint(x: rect.width, y: rowH * 4))
-                }
-                .stroke(Theme.gridLine, lineWidth: 1)
+                // ===== Header merges (top row only) =====
+                if let headerRect = rowRects.first {
+                    // Fill to hide the interior verticals inside the header
+                    Rectangle()
+                        .fill(Theme.leftHeaderBg)
+                        .frame(width: headerRect.width, height: headerRect.height)
+                        .position(x: headerRect.midX, y: headerRect.midY)
 
-                // Thicker team boundary between rows 2 and 3 (double stroke)
-                Path { p in
-                    let y = rowH * 3
-                    p.move(to: CGPoint(x: 0, y: y - 1))
-                    p.addLine(to: CGPoint(x: rect.width, y: y - 1))
-                    p.move(to: CGPoint(x: 0, y: y + 1))
-                    p.addLine(to: CGPoint(x: rect.width, y: y + 1))
-                }
-                .stroke(Theme.gridLine, lineWidth: 1)
+                    // Header outline
+                    Rectangle()
+                        .stroke(Theme.gridLine, lineWidth: 1)
+                        .frame(width: headerRect.width, height: headerRect.height)
+                        .position(x: headerRect.midX, y: headerRect.midY)
 
-                // ===== Top-row merges =====
-                // Fill the entire header row to hide interior verticals
-                Rectangle()
-                    .fill(Theme.leftHeaderBg)
-                    .frame(width: rect.width, height: rowH)
-                    .position(x: rect.width / 2, y: rowH / 2)
-
-                // Outline the header row
-                Rectangle()
+                    // Re-draw only the desired cut lines inside the header:
+                    // after cols 3, 6, 9, 12, 15  → merges: 1–3, 4–6, 7–9, 10–12, 13–15, 16 alone
+                    Path { p in
+                        let cutIndices: [Int] = [3, 6, 9, 12, 15]
+                        for i in cutIndices {
+                            let x = CGFloat(i) * colW
+                            p.move(to: CGPoint(x: x, y: headerRect.minY))
+                            p.addLine(to: CGPoint(x: x, y: headerRect.maxY))
+                        }
+                    }
                     .stroke(Theme.gridLine, lineWidth: 1)
-                    .frame(width: rect.width, height: rowH)
-                    .position(x: rect.width / 2, y: rowH / 2)
-
-                // Redraw only the desired cut lines in header:
-                // after cols 3, 6, 9, 12, 15  → merges: 1–3, 4–6, 7–9, 10–12, 13–15, and 16 alone
-                Path { p in
-                    let cutIndices: [Int] = [3, 6, 9, 12, 15]
-                    for i in cutIndices {
-                        let x = CGFloat(i) * colW
-                        p.move(to: CGPoint(x: x, y: 0))
-                        p.addLine(to: CGPoint(x: x, y: rowH))
-                    }
                 }
-                .stroke(Theme.gridLine, lineWidth: 1)
             }
         }
+    }
+
+    // MARK: - Pure helper (keeps control flow out of ViewBuilder)
+    /// Returns uniform-height row rects that exactly fill `tableSize.height`
+    /// with `gapH`-tall gaps inserted after rows listed in `gapAfterRows` (1-based).
+    private static func buildRowRects(
+        tableSize: CGSize,
+        rows: Int,
+        gapAfterRows: [Int],
+        gapH: CGFloat
+    ) -> [CGRect] {
+        let gapCount = gapAfterRows.count
+        let totalGap = CGFloat(gapCount) * gapH
+        let rowH = max(0, (tableSize.height - totalGap) / CGFloat(rows))
+
+        var rects: [CGRect] = []
+        var y: CGFloat = 0
+        for r in 1...rows {
+            let rr = CGRect(x: 0, y: y, width: tableSize.width, height: rowH)
+            rects.append(rr)
+            y += rowH
+            if gapAfterRows.contains(r) {
+                y += gapH
+            }
+        }
+        return rects
     }
 }
 
 // MARK: - Preview
-#Preview {
+#Preview(traits: .landscapeLeft) {
     NotchSafeScoreTable()
-        .previewInterfaceOrientation(.landscapeLeft)
 }
