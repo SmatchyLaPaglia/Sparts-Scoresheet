@@ -13,16 +13,36 @@ struct NotchSafeView<Content: View>: View {
     private let paddingPercentSideOppositeNotch: CGFloat
     private let heightPercent: CGFloat
 
+    // Whether to draw the built-in base panel (only when no custom content provided)
+    private let shouldDrawBasePanel: Bool
+
     let content: (_ safeRect: CGRect) -> Content
 
-    init(heightPercent: CGFloat = 100,
-         paddingPercentNotchSide: CGFloat = 0,
-         paddingPercentSideOppositeNotch: CGFloat = 0,
-         @ViewBuilder content: @escaping (_ safeRect: CGRect) -> Content) {
+    // MARK: Primary init — custom content provided → do NOT draw base panel
+    init(
+        heightPercent: CGFloat = 100,
+        paddingPercentNotchSide: CGFloat = 0,
+        paddingPercentSideOppositeNotch: CGFloat = 0,
+        @ViewBuilder content: @escaping (_ safeRect: CGRect) -> Content
+    ) {
         self.heightPercent = heightPercent
         self.paddingPercentNotchSide = paddingPercentNotchSide
         self.paddingPercentSideOppositeNotch = paddingPercentSideOppositeNotch
         self.content = content
+        self.shouldDrawBasePanel = false
+    }
+
+    // MARK: Convenience init — no content provided → draw base panel
+    init(
+        heightPercent: CGFloat = 100,
+        paddingPercentNotchSide: CGFloat = 0,
+        paddingPercentSideOppositeNotch: CGFloat = 0
+    ) where Content == EmptyView {
+        self.heightPercent = heightPercent
+        self.paddingPercentNotchSide = paddingPercentNotchSide
+        self.paddingPercentSideOppositeNotch = paddingPercentSideOppositeNotch
+        self.content = { _ in EmptyView() }
+        self.shouldDrawBasePanel = true
     }
 
     var body: some View {
@@ -60,12 +80,14 @@ struct NotchSafeView<Content: View>: View {
                 Color(red: 0.72, green: 0.52, blue: 0.72)
                     .ignoresSafeArea()
 
-                // Base panel matching the safe rect (background + border)
-                Rectangle()
-                    .fill(Theme.leftHeaderBg)
-                    .overlay(Rectangle().stroke(Theme.gridLine, lineWidth: 1))
-                    .frame(width: safeRect.width, height: safeRect.height)
-                    .position(x: safeRect.midX, y: safeRect.midY)
+                // Draw our base panel ONLY when no custom content was provided
+                if shouldDrawBasePanel {
+                    Rectangle()
+                        .fill(Theme.leftHeaderBg)
+                        .overlay(Rectangle().stroke(Theme.gridLine, lineWidth: 1))
+                        .frame(width: safeRect.width, height: safeRect.height)
+                        .position(x: safeRect.midX, y: safeRect.midY)
+                }
 
                 // Caller-provided content, pinned to the same rect
                 content(safeRect)
@@ -79,18 +101,16 @@ struct NotchSafeView<Content: View>: View {
     }
 }
 
+// MARK: - Previews
 
-#Preview {
-    NotchSafeView() { barRect in
-        HStack(spacing: 12) {
-            Image(systemName: "square.grid.2x2")
-            Text("Sparts Scoresheet")
-                .font(.headline)
-            Spacer(minLength: 0)
-            Image(systemName: "gearshape")
-        }
-        .padding(.horizontal, 12)
-        .frame(maxHeight: .infinity, alignment: .center)
+#Preview("With base panel", traits: .landscapeLeft) {
+    // Uses the convenience init → draws its own panel
+    NotchSafeView(heightPercent: 100, paddingPercentNotchSide: 0, paddingPercentSideOppositeNotch: 0)
+}
+
+#Preview("With custom content", traits: .landscapeLeft) {
+    // Uses the primary init (with content) → suppresses base panel
+    NotchSafeView(heightPercent: 70, paddingPercentNotchSide: 3, paddingPercentSideOppositeNotch: 3) { safeRect in
+        RoundedRectangle(cornerRadius: 8).stroke(.yellow, lineWidth: 2)
     }
-    .previewInterfaceOrientation(.landscapeLeft)
 }
