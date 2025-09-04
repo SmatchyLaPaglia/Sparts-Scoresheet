@@ -1,32 +1,33 @@
 //
-//  NotchSafeHeader.swift
+//  NotchSafeView.swift
 //  Sparts Scoresheet
 //
 
 import SwiftUI
 
-struct NotchSafeHeader<BarContent: View>: View {
+struct NotchSafeView<Content: View>: View {
     @StateObject private var orientationManager = OrientationManager()
     @State private var safeAreaInsets: EdgeInsets = .init()
 
-    private let paddingPercentNotchSide:         CGFloat = 0
-    private let paddingPercentSideOppositeNotch: CGFloat = 0
-
-    // NEW: overall bar height as % of the view’s height
+    private let paddingPercentNotchSide:         CGFloat
+    private let paddingPercentSideOppositeNotch: CGFloat
     private let heightPercent: CGFloat
 
-    // Draws on top of the bar without affecting layout
-    let barContent: (_ barRect: CGRect) -> BarContent
+    let content: (_ safeRect: CGRect) -> Content
 
-    init(heightPercent: CGFloat = 70,
-         @ViewBuilder barContent: @escaping (_ barRect: CGRect) -> BarContent = { _ in EmptyView() }) {
+    init(heightPercent: CGFloat = 100,
+         paddingPercentNotchSide: CGFloat = 0,
+         paddingPercentSideOppositeNotch: CGFloat = 0,
+         @ViewBuilder content: @escaping (_ safeRect: CGRect) -> Content) {
         self.heightPercent = heightPercent
-        self.barContent = barContent
+        self.paddingPercentNotchSide = paddingPercentNotchSide
+        self.paddingPercentSideOppositeNotch = paddingPercentSideOppositeNotch
+        self.content = content
     }
 
     var body: some View {
         GeometryReader { geometry in
-            // --- Compute notch + edge span (all constants BEFORE building views) ---
+            // --- Compute notch + edge span (DON'T TOUCH THIS) ---
             let (leftNotchPos, rightNotchPos) = NotchDetection.detectBothNotchPositions(
                 safeAreaInsets: safeAreaInsets,
                 screenWidth: geometry.size.width
@@ -36,59 +37,51 @@ struct NotchSafeHeader<BarContent: View>: View {
             )
 
             let isLandscapeRight = (orientationManager.currentLandscapeDirection == .landscapeRight)
-            // Notch on RIGHT → span LEFT physical edge → RIGHT notch
-            // Notch on LEFT  → span LEFT notch        → RIGHT physical edge
             let spanStart: CGFloat = isLandscapeRight ? leftEdgePos   : leftNotchPos
             let spanEnd:   CGFloat = isLandscapeRight ? rightNotchPos : rightEdgePos
             let spanWidth         = max(0, spanEnd - spanStart)
 
-            // Padding semantics
             let notchPad    = spanWidth * (paddingPercentNotchSide / 100)
             let oppositePad = spanWidth * (paddingPercentSideOppositeNotch / 100)
 
-            // Apply pads to the correct sides depending on where the notch is
             let startX: CGFloat = isLandscapeRight ? (spanStart + oppositePad) : (spanStart + notchPad)
             let endX:   CGFloat = isLandscapeRight ? (spanEnd   - notchPad)    : (spanEnd   - oppositePad)
-            let barWidth        = max(0, endX - startX)
+            let width          = max(0, endX - startX)
 
-            // NEW: bar height derived from view height
-            let barHeight = max(0, geometry.size.height * (heightPercent / 100))
+            let height   = max(0, geometry.size.height * (heightPercent / 100))
+            let centerY  = geometry.size.height / 2
+            let safeRect = CGRect(x: startX,
+                                  y: centerY - height/2,
+                                  width: width,
+                                  height: height)
 
-            // --- Build the view AFTER all constants are ready ---
             ZStack {
-                // purple so simulator bounds are visible
+                // slightly off-black so simulator bounds are visible
                 Color(red: 0.72, green: 0.52, blue: 0.72)
                     .ignoresSafeArea()
 
-                // Header/table bar constrained to the notch-safe lateral span
+                // Base panel matching the safe rect (background + border)
                 Rectangle()
                     .fill(Theme.leftHeaderBg)
                     .overlay(Rectangle().stroke(Theme.gridLine, lineWidth: 1))
-                    .frame(width: barWidth, height: barHeight)
-                    .position(x: startX + barWidth / 2,
-                              y: geometry.size.height / 2)
+                    .frame(width: safeRect.width, height: safeRect.height)
+                    .position(x: safeRect.midX, y: safeRect.midY)
 
-                // Draw arbitrary content on top of the bar without changing its size/position
-                barContent(CGRect(x: startX,
-                                  y: geometry.size.height/2 - barHeight/2,
-                                  width: barWidth,
-                                  height: barHeight))
-                    .frame(width: barWidth, height: barHeight)
-                    .position(x: startX + barWidth / 2,
-                              y: geometry.size.height / 2)
-                    .allowsHitTesting(true)
+                // Caller-provided content, pinned to the same rect
+                content(safeRect)
+                    .frame(width: safeRect.width, height: safeRect.height)
+                    .position(x: safeRect.midX, y: safeRect.midY)
             }
             .onAppear { safeAreaInsets = geometry.safeAreaInsets }
-            .onChange(of: geometry.size) { _ in
-                safeAreaInsets = geometry.safeAreaInsets
-            }
+            .onChange(of: geometry.size) { _ in safeAreaInsets = geometry.safeAreaInsets }
         }
         .ignoresSafeArea()
     }
 }
 
+
 #Preview {
-    NotchSafeHeader() { barRect in
+    NotchSafeView() { barRect in
         HStack(spacing: 12) {
             Image(systemName: "square.grid.2x2")
             Text("Sparts Scoresheet")
