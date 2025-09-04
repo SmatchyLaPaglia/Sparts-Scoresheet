@@ -7,13 +7,17 @@ import SwiftUI
 
 struct NotchSafeScoreTable: View {
     // Table size inside the notch-safe span
-    var heightPercent: CGFloat = 60
+    var heightPercent: CGFloat = 80
     // Grid shape
     var columns: Int = 16
     var rows: Int = 5
 
-    // Gaps and size
-    var gapAfterRows: [Int] = [1, 3]                   // 1-based indices with a gap after
+    // Rounded row ends (left & right corners per row)
+    var rowCornerRadius: CGFloat = 14
+
+    // Gaps that show the phone background between rows (1-based indices)
+    var gapAfterRows: [Int] = [1, 3]
+    // Gap size relative to screen height
     var rowSeparatorSizeAsPercentOfScreenHeight: CGFloat = 2
 
     var body: some View {
@@ -26,7 +30,6 @@ struct NotchSafeScoreTable: View {
             // --- Metrics (no control-flow at view level) ---
             let safeCols  = max(columns, 1)
             let safeRows  = max(rows, 1)
-            let colW      = rect.width / CGFloat(safeCols)
 
             // Gap height is based on *screen* height, not table height
             let screenH   = UIScreen.main.bounds.height
@@ -41,70 +44,115 @@ struct NotchSafeScoreTable: View {
             )
 
             ZStack {
-                // ===== Header fill first (so later lines appear on top) =====
-                if let headerRect = rowRects.first {
-                    Rectangle()
-                        .fill(Theme.leftHeaderBg)
-                        .frame(width: headerRect.width, height: headerRect.height)
-                        .position(x: headerRect.midX, y: headerRect.midY)
-                }
-                
-                // Header fill first (unchanged)
-                if let headerRect = rowRects.first {
-                    Rectangle()
-                        .fill(Theme.leftHeaderBg)
-                        .frame(width: headerRect.width, height: headerRect.height)
-                        .position(x: headerRect.midX, y: headerRect.midY)
-                }
+                // One stack per row so we can clip fills + lines to rounded ends
+                ForEach(0..<rowRects.count, id: \.self) { idx in
+                    let r = rowRects[idx]
+                    let rowNumber = idx + 1
+                    let colW = r.width / CGFloat(safeCols)
 
-                // NEW: paint body cell backgrounds behind the lines
-                let fills = NotchSafeScoreTable.buildBodyFills(rowRects: rowRects, cols: safeCols, colW: colW)
-                ForEach(0..<fills.count, id: \.self) { i in
-                    let f = fills[i]
-                    Rectangle()
-                        .fill(f.color)
-                        .frame(width: f.rect.width, height: f.rect.height)
-                        .position(x: f.rect.midX, y: f.rect.midY)
-                }
-
-                // ===== Row outlines (no base background grid) =====
-                Path { p in
-                    for r in rowRects { p.addRect(r) }
-                }
-                .stroke(Theme.gridLine, lineWidth: 1)
-
-                // ===== Vertical dividers, row-aware =====
-                // Header (row 1): cut lines at 3,6,9,12,15
-                // Rows 2–5: merge 1–3 → skip verticals at 1 and 2
-                Path { p in
-                    for (idx, r) in rowRects.enumerated() {
-                        let rowNumber = idx + 1
+                    ZStack {
+                        // === BACKGROUND FILLS (rounded via clip on container) ===
                         if rowNumber == 1 {
-                            let headerCuts = [3, 6, 9, 12, 15]
-                            for i in headerCuts where i < safeCols {
-                                let x = CGFloat(i) * colW
-                                p.move(to: CGPoint(x: x, y: r.minY))
-                                p.addLine(to: CGPoint(x: x, y: r.maxY))
-                            }
+                            // Header is a single band
+                            RoundedRectangle(cornerRadius: 0) // local shape, no extra rounding
+                                .fill(Theme.leftHeaderBg)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
-                            if safeCols > 1 {
-                                for i in 1..<safeCols where i != 1 && i != 2 { // merge cols 1–3
+                            // Body cell backgrounds in local coords [0..r.width]
+                            // 1) Name stripe (merged 1–3), alternating light/dark
+                            let nameColor = (rowNumber % 2 == 0) ? Theme.nameStripeDark : Theme.nameStripeLight
+                            Rectangle()
+                                .fill(nameColor)
+                                .frame(width: colW * 3, height: r.height)
+                                .position(x: colW * 1.5, y: r.height / 2)
+
+                            // 2) bid/took (col 4)
+                            Rectangle()
+                                .fill(Theme.leftHeaderBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 3.5, y: r.height / 2)
+
+                            // 3) spades bid/took (cols 5–6) – white
+                            Rectangle().fill(Theme.cellBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 4.5, y: r.height / 2)
+                            Rectangle().fill(Theme.cellBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 5.5, y: r.height / 2)
+
+                            // 4) hearts / queen / moon (cols 7–9) – dark mini headers
+                            Rectangle().fill(Theme.leftHeaderBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 6.5, y: r.height / 2)
+                            Rectangle().fill(Theme.leftHeaderBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 7.5, y: r.height / 2)
+                            Rectangle().fill(Theme.leftHeaderBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 8.5, y: r.height / 2)
+
+                            // 5) HAND SCORES (cols 10–12)
+                            Rectangle().fill(Theme.rightSpadesScoreBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 9.5, y: r.height / 2)
+                            Rectangle().fill(Theme.rightHeartsScoreBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 10.5, y: r.height / 2)
+                            Rectangle().fill(Theme.rightHandScoreBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 11.5, y: r.height / 2)
+
+                            // 6) TOTAL SCORES (cols 13–15)
+                            Rectangle().fill(Theme.rightSpadesTotalBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 12.5, y: r.height / 2)
+                            Rectangle().fill(Theme.rightHeartsTotalBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 13.5, y: r.height / 2)
+                            Rectangle().fill(Theme.rightAllBagsBg)
+                                .frame(width: colW, height: r.height)
+                                .position(x: colW * 14.5, y: r.height / 2)
+
+                            // 7) GRAND TOTAL (col 16)
+                            if safeCols >= 16 {
+                                Rectangle().fill(Theme.rightGameTotalBg)
+                                    .frame(width: colW, height: r.height)
+                                    .position(x: colW * 15.5, y: r.height / 2)
+                            }
+                        }
+
+                        // === VERTICAL LINES for THIS ROW (masked to the rounded shape) ===
+                        Path { p in
+                            if rowNumber == 1 {
+                                // Header: cuts only at merge boundaries
+                                let cuts = [3, 6, 9, 12, 15]
+                                for i in cuts where i < safeCols {
                                     let x = CGFloat(i) * colW
-                                    p.move(to: CGPoint(x: x, y: r.minY))
-                                    p.addLine(to: CGPoint(x: x, y: r.maxY))
+                                    p.move(to: CGPoint(x: x, y: 0))
+                                    p.addLine(to: CGPoint(x: x, y: r.height))
+                                }
+                            } else {
+                                // Body: merge 1–3 (skip 1 & 2)
+                                if safeCols > 1 {
+                                    for i in 1..<safeCols where i != 1 && i != 2 {
+                                        let x = CGFloat(i) * colW
+                                        p.move(to: CGPoint(x: x, y: 0))
+                                        p.addLine(to: CGPoint(x: x, y: r.height))
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-                .stroke(Theme.gridLine, lineWidth: 1)
-
-                // ===== Header outline last (on top) =====
-                if let headerRect = rowRects.first {
-                    Rectangle()
                         .stroke(Theme.gridLine, lineWidth: 1)
-                        .frame(width: headerRect.width, height: headerRect.height)
-                        .position(x: headerRect.midX, y: headerRect.midY)
+                    }
+                    // Clip ENTIRE row stack (fills + lines) to rounded ends
+                    .clipShape(RoundedRectangle(cornerRadius: rowCornerRadius))
+                    // Rounded outline drawn on top; strokeBorder keeps it inside the clip
+                    .overlay(
+                        RoundedRectangle(cornerRadius: rowCornerRadius)
+                            .strokeBorder(Theme.gridLine, lineWidth: 1)
+                    )
+                    .frame(width: r.width, height: r.height)
+                    .position(x: r.midX, y: r.midY)
                 }
             }
         }
@@ -126,64 +174,11 @@ struct NotchSafeScoreTable: View {
         var rects: [CGRect] = []
         var y: CGFloat = 0
         for r in 1...rows {
-            let rr = CGRect(x: 0, y: y, width: tableSize.width, height: rowH)
-            rects.append(rr)
+            rects.append(CGRect(x: 0, y: y, width: tableSize.width, height: rowH))
             y += rowH
             if gapAfterRows.contains(r) { y += gapH }
         }
         return rects
-    }
-    
-    private struct CellFill { let rect: CGRect; let color: Color }
-
-    private static func buildBodyFills(
-        rowRects: [CGRect],
-        cols: Int,
-        colW: CGFloat
-    ) -> [CellFill] {
-        guard rowRects.count >= 2 else { return [] }           // rows 2–N only
-        var fills: [CellFill] = []
-
-        func colRect(_ c0: Int, _ c1Exclusive: Int, in row: CGRect) -> CGRect {
-            let x0 = CGFloat(c0) * colW
-            let w  = CGFloat(c1Exclusive - c0) * colW
-            return CGRect(x: row.minX + x0, y: row.minY, width: w, height: row.height)
-        }
-
-        for (i, row) in rowRects.enumerated() where i >= 1 {   // 1-based rows 2..N
-            let r = i + 1                                      // 1-based index
-            // Name stripe (merged 1–3), alternating light/dark
-            let nameColor = (r % 2 == 0) ? Theme.nameStripeDark : Theme.nameStripeLight
-            fills.append(.init(rect: colRect(0, 3, in: row), color: nameColor))
-
-            // bid/took (col 4)
-            fills.append(.init(rect: colRect(3, 4, in: row), color: Theme.leftHeaderBg))
-
-            // spades bid/took (cols 5–6) – white
-            fills.append(.init(rect: colRect(4, 5, in: row), color: Theme.cellBg))
-            fills.append(.init(rect: colRect(5, 6, in: row), color: Theme.cellBg))
-
-            // hearts / queen / moon (cols 7–9) – dark mini headers
-            fills.append(.init(rect: colRect(6, 7, in: row), color: Theme.leftHeaderBg))
-            fills.append(.init(rect: colRect(7, 8, in: row), color: Theme.leftHeaderBg))
-            fills.append(.init(rect: colRect(8, 9, in: row), color: Theme.leftHeaderBg))
-
-            // HAND SCORES (cols 10–12)
-            fills.append(.init(rect: colRect(9, 10, in: row), color: Theme.rightSpadesScoreBg))
-            fills.append(.init(rect: colRect(10, 11, in: row), color: Theme.rightHeartsScoreBg))
-            fills.append(.init(rect: colRect(11, 12, in: row), color: Theme.rightHandScoreBg))
-
-            // TOTAL SCORES (cols 13–15)
-            fills.append(.init(rect: colRect(12, 13, in: row), color: Theme.rightSpadesTotalBg))
-            fills.append(.init(rect: colRect(13, 14, in: row), color: Theme.rightHeartsTotalBg))
-            fills.append(.init(rect: colRect(14, 15, in: row), color: Theme.rightAllBagsBg))
-
-            // GRAND TOTAL (col 16)
-            if cols >= 16 {
-                fills.append(.init(rect: colRect(15, 16, in: row), color: Theme.rightGameTotalBg))
-            }
-        }
-        return fills
     }
 }
 

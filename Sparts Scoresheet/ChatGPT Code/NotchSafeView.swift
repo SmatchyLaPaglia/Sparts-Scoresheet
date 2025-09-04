@@ -76,9 +76,11 @@ struct NotchSafeView<Content: View>: View {
                                   height: height)
 
             ZStack {
-                // slightly off-black so simulator bounds are visible
-                Color(red: 0.72, green: 0.52, blue: 0.72)
-                    .ignoresSafeArea()
+                // Only draw the purple backdrop when we're drawing the built-in base panel
+                if shouldDrawBasePanel {
+                    Color(red: 0.72, green: 0.52, blue: 0.72)
+                        .ignoresSafeArea()
+                }
 
                 // Draw our base panel ONLY when no custom content was provided
                 if shouldDrawBasePanel {
