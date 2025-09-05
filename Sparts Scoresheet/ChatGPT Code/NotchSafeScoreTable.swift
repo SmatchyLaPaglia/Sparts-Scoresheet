@@ -7,7 +7,7 @@ import SwiftUI
 
 struct NotchSafeScoreTable: View {
     // Table size inside the notch-safe span
-    var heightPercent: CGFloat = 55
+    var heightPercent: CGFloat = 50
     // Grid shape
     var columns: Int = 16
     var rows: Int = 5
@@ -18,16 +18,7 @@ struct NotchSafeScoreTable: View {
     // Gaps that show the phone background between rows (1-based indices)
     var gapAfterRows: [Int] = [1, 3]
     // Gap size relative to screen height
-    var rowSeparatorSizeAsPercentOfScreenHeight: CGFloat = 2
-
-    // --- NEW: manual color control (1-based row & col) ---
-    // Example below in Preview overrides rows 3 & 5, cols 5–7 → nameStripeDark
-    var cellOverrides: [Int: [Int: Color]] = [
-        3: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark, 8: Theme.nameStripeDark,
-            9: Theme.nameStripeDark],
-        5: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark, 8: Theme.nameStripeDark,
-            9: Theme.nameStripeDark]
-    ]
+    var rowSeparatorSizeAsPercentOfScreenHeight: CGFloat = 1.5
 
     var body: some View {
         ZStack{
@@ -131,15 +122,16 @@ struct NotchSafeScoreTable: View {
     /// Returns the background color for a cell (1-based row/col) if any.
     /// Checks overrides first, then falls back to a default scheme.
     private func colorForCell(row: Int, col: Int, totalCols: Int) -> Color? {
-        // 1) Explicit overrides win
-        if let rowMap = cellOverrides[row], let override = rowMap[col] {
-            return override
-        }
-
-        // 2) Default scheme
+        
+        // Default scheme
         if row == 1 {
-            // Header band (can still be overridden per cell)
+            // Header band
             return Theme.leftHeaderBg
+        } else if row == 2 || row == 4 {
+            // Team headers
+            if col > 9 {
+                return Theme.leftHeaderBg
+            }
         }
 
         // Body rows default:
@@ -160,9 +152,17 @@ struct NotchSafeScoreTable: View {
         case 4:
             return Theme.leftHeaderBg
         case 5, 6:
-            return Theme.cellBg
+            if row == 2 || row == 4 {
+                return Theme.nameStripeDark
+            } else {
+                return Theme.nameStripeLight
+            }
         case 7, 8, 9:
-            return Theme.leftHeaderBg
+            if row == 3 || row == 5 {
+                return Theme.nameStripeLight
+            } else {
+                return Theme.leftHeaderBg
+            }
         case 10:
             return Theme.rightSpadesScoreBg
         case 11:
@@ -215,13 +215,5 @@ struct NotchSafeScoreTable: View {
 //        5: [5: Theme.nameStripeDark, 6: Theme.nameStripeDark, 7: Theme.nameStripeDark]
 //    ]
 
-    return NotchSafeScoreTable(
-        heightPercent: 55,
-        columns: 16,
-        rows: 5,
-        rowCornerRadius: 7,
-        gapAfterRows: [1, 3],
-        rowSeparatorSizeAsPercentOfScreenHeight: 2,
-//        cellOverrides: overrides
-    )
+    return NotchSafeScoreTable()
 }

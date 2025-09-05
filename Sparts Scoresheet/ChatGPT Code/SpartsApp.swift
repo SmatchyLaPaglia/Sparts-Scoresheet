@@ -13,12 +13,18 @@ import SwiftUI
 struct SpartsApp: App {
     var body: some Scene {
         WindowGroup {
-            ScoreSheetsView()
-        }
+            let teams = [
+                Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)], hearts: 0, queensSpades: false, moonShot: false),
+                Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)], hearts: 0, queensSpades: false, moonShot: false)
+            ]
+            return ScoreTable(teams: teams)        }
     }
 }
 
 // MARK: - Preview
 #Preview {
-    ScoreSheetsView()
-}
+    let teams = [
+        Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)], hearts: 0, queensSpades: false, moonShot: false),
+        Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)], hearts: 0, queensSpades: false, moonShot: false)
+    ]
+    return ScoreTable(teams: teams)}
