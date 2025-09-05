@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // --- Stubs to mirror Codea structures ---
 struct Teams {
@@ -147,9 +148,6 @@ struct ScoreTable: View {
     var teams: [Teams]
     var lp: [String]
     var lpThreshold: TimeInterval = 0.45
-    var metrics: Metrics?
-    var numberFontSize: CGFloat = 12
-    var lpFrames: [String: CGRect] = [:]
     var layout: LayoutParams = .default
     
     // One state object for each entry in lp
@@ -158,6 +156,9 @@ struct ScoreTable: View {
     @State private var longPressEnabled: Bool = true
     @State private var confirmVisible: Bool = false
     @State private var cells: [String: Any] = [:]
+    @State private var metrics = Metrics()
+    @State private var numberFontSize: CGFloat = 12
+    @State private var lpFrames: [String: CGRect] = [:]
     
     // MARK: - Confirm handlers (Codea -> SwiftUI)
     private func confirmBackdropTapped() {
@@ -182,11 +183,11 @@ struct ScoreTable: View {
     }
     
     // MARK: - New helpers (add inside ScoreTable)
-    mutating func setLPFrame(_ key: String, _ rect: CGRect) {
+    private func setLPFrame(_ key: String, _ rect: CGRect) {
         lpFrames[key] = rect
     }
 
-    mutating func setCellFrame(key: String, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
+    private func setCellFrame(key: String, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
         if var inc = cells[key] as? IncrementingCell {
             inc.x = x; inc.y = y; inc.w = w; inc.h = h
             cells[key] = inc
@@ -260,9 +261,9 @@ struct ScoreTable: View {
     
     // MARK: - ScoreTable.layout (line-by-line from Codea)
 
-    mutating func layout(safeW: CGFloat, safeH: CGFloat) {
-        // local safeW, safeH = WIDTH, HEIGHT
-        // overallW/H and inner rect
+    private func selfLayout() {
+        let safeW = UIScreen.main.bounds.width
+        let safeH = UIScreen.main.bounds.height
         let overallW = safeW * layout.overallWidthPercent / 100
         let overallH = safeH * layout.overallHeightPercent / 100
         let overallX = (safeW - overallW) / 2
@@ -278,11 +279,9 @@ struct ScoreTable: View {
         let gapW   = innerW * layout.gapTablesPercent      / 100
         let rightW = max(0, innerW - leftW - gapW)
         let tablesH = innerH * layout.tablesHeightPercent / 100
-
-        // self.metrics = self.metrics or {}
-        // local m = self.metrics
-        if metrics == nil { metrics = Metrics() }
-        var m = metrics!
+        
+        //   - write to `numberFontSize` only if it’s a @State (otherwise skip for now)
+        var m = metrics
 
         // -- Heights
         m.leftHeaderH  = max(28, min(64, tablesH / 5))
@@ -366,9 +365,121 @@ struct ScoreTable: View {
         setCellFrame(key: "t2_moon",     x: x_moonCol,                y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
 
         self.numberFontSize = m.leftRowH * 0.5   // (match Codea placement)
-        self.metrics = m                         // write back
-        applyNumberFontSize()                    // self:_applyNumberFontSize()
+
+        metrics = m
+        
+        applyNumberFontSize()
     }
+//    mutating func layout(safeW: CGFloat, safeH: CGFloat) {
+//        // local safeW, safeH = WIDTH, HEIGHT
+//        // overallW/H and inner rect
+//        let overallW = safeW * layout.overallWidthPercent / 100
+//        let overallH = safeH * layout.overallHeightPercent / 100
+//        let overallX = (safeW - overallW) / 2
+//        let overallY = (safeH - overallH) / 2
+//        let pad = layout.overallInnerPadding
+//        let innerX = overallX + pad
+//        let innerY = overallY + pad
+//        let innerW = overallW - pad*2
+//        let innerH = overallH - pad*2
+//
+//        // left / gap / right widths & tables height
+//        let leftW  = innerW * layout.leftTableWidthPercent / 100
+//        let gapW   = innerW * layout.gapTablesPercent      / 100
+//        let rightW = max(0, innerW - leftW - gapW)
+//        let tablesH = innerH * layout.tablesHeightPercent / 100
+//
+//        // self.metrics = self.metrics or {}
+//        // local m = self.metrics
+//        if metrics == nil { metrics = Metrics() }
+//        var m = metrics!
+//
+//        // -- Heights
+//        m.leftHeaderH  = max(28, min(64, tablesH / 5))
+//        m.leftRowH     = m.leftHeaderH
+//        m.rightHeaderH = m.leftHeaderH
+//        // right table rows should match left table row height (no double height)
+//        m.rightRowH    = m.leftRowH
+//
+//        // -- Column widths
+//        m.wName   = leftW * LeftCols.nameFrac
+//        m.wNarrow = leftW * LeftCols.narrowFrac
+//        m.wHearts = leftW * LeftCols.heartsFrac
+//        m.wScore  = rightW / CGFloat(RIGHT.cols)
+//
+//        // -- Anchors
+//        m.innerX = innerX
+//        m.innerY = innerY
+//        m.leftW  = leftW
+//        m.gapW   = gapW
+//        m.rightW = rightW
+//        m.tablesH = tablesH
+//
+//        // -- Y positions
+//        m.headY         = innerY + tablesH - m.leftHeaderH
+//        m.yAfterHeadGap = m.headY - layout.headerGap
+//        m.t1_row1       = m.yAfterHeadGap - m.leftRowH
+//        m.t1_row2       = m.t1_row1 - m.leftRowH
+//        m.t2_row1       = m.t1_row2 - layout.teamGap - m.leftRowH
+//        m.t2_row2       = m.t2_row1 - m.leftRowH
+//
+//        self.numberFontSize = m.leftRowH * 0.5
+//
+//        // -- Take one score-column from the right table to widen the name column
+//        let bumpW = m.wScore                // width of one right-table column
+//        m.wName   = m.wName + bumpW         // widen the TEAM/PLAYER name column
+//        m.leftW   = m.leftW + bumpW         // shift the boundary between left and right tables
+//        m.rightW  = m.rightW - bumpW        // shrink right table to keep total width consistent
+//        m.wScore  = m.rightW / CGFloat(RIGHT.cols)  // recompute per-column width on the right
+//
+//        // -- Base X helpers
+//        let x_afterLabel = m.innerX + m.wName + m.wNarrow        // after "bid/took"
+//        let x_heartsCol  = m.innerX + m.wName + m.wNarrow * 3
+//        let x_qsCol      = x_heartsCol + m.wHearts
+//        let x_moonCol    = x_heartsCol + m.wHearts * 2
+//
+//        // -- Name cell rectangles
+//        func nameRect(_ y: CGFloat) -> CGRect {
+//            CGRect(x: m.innerX, y: y, width: m.wName, height: m.leftRowH)
+//        }
+//        setLPFrame("t1_p1_name", nameRect(m.t1_row1))
+//        setLPFrame("t1_p2_name", nameRect(m.t1_row2))
+//        setLPFrame("t2_p1_name", nameRect(m.t2_row1))
+//        setLPFrame("t2_p2_name", nameRect(m.t2_row2))
+//
+//        // -- TEAMS header cell rectangle
+//        setLPFrame(
+//            "headerTeam",
+//            CGRect(x: m.innerX, y: m.headY, width: m.wName, height: m.leftHeaderH)
+//        )
+//
+//        // -- Team 1, player 1 (top row)
+//        setCellFrame(key: "t1_p1_bid",   x: x_afterLabel,             y: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
+//        setCellFrame(key: "t1_p1_took",  x: x_afterLabel + m.wNarrow, y: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
+//
+//        // -- Team 1, player 2 (bottom row)
+//        setCellFrame(key: "t1_p2_bid",   x: x_afterLabel,             y: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
+//        setCellFrame(key: "t1_p2_took",  x: x_afterLabel + m.wNarrow, y: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
+//        setCellFrame(key: "t1_hearts",   x: x_heartsCol,              y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
+//        setCellFrame(key: "t1_qs",       x: x_qsCol,                  y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
+//        setCellFrame(key: "t1_moon",     x: x_moonCol,                y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
+//
+//        // -- Team 2, player 1 (top row)
+//        setCellFrame(key: "t2_p1_bid",   x: x_afterLabel,             y: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
+//        setCellFrame(key: "t2_p1_took",  x: x_afterLabel + m.wNarrow, y: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
+//
+//        // -- Team 2, player 2 (bottom row)
+//        setCellFrame(key: "t2_p2_bid",   x: x_afterLabel,             y: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
+//        setCellFrame(key: "t2_p2_took",  x: x_afterLabel + m.wNarrow, y: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
+//        setCellFrame(key: "t2_hearts",   x: x_heartsCol,              y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
+//        setCellFrame(key: "t2_qs",       x: x_qsCol,                  y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
+//        setCellFrame(key: "t2_moon",     x: x_moonCol,                y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
+//
+//        self.numberFontSize = m.leftRowH * 0.5   // (match Codea placement)
+//        self.metrics = m                         // write back
+//        
+//        applyNumberFontSize()
+//    }
 
     // Direct line-by-line analog to setLongPressEnabled(on)
     func setLongPressEnabled(_ on: Bool = true) {
@@ -386,7 +497,7 @@ struct ScoreTable: View {
     }
     
     // Helper to mutate a typed cell stored as Any
-    private mutating func _mutateCell<T>(_ key: String, as _: T.Type, _ body: (inout T) -> Void) {
+    private func _mutateCell<T>(_ key: String, as _: T.Type, _ body: (inout T) -> Void) {
         guard var val = cells[key] as? T else { return }
         body(&val)
         cells[key] = val
@@ -550,7 +661,7 @@ struct ScoreTable: View {
         .position(x: x + w/2, y: y + h/2)
     }
     
-    mutating func _skinInputs() {
+    private func _skinInputs() {
         for (k, v) in cells {
             if var cell = v as? IncrementingCell, cell.set {
                 cell.colBg        = Theme.cellBg
@@ -570,7 +681,11 @@ struct ScoreTable: View {
     }
     
     var body: some View {
-        EmptyView() // intentionally does nothing (per your request)
+        EmptyView()
+            .onAppear {
+                selfLayout()
+                _skinInputs()
+            }
         
         
         
