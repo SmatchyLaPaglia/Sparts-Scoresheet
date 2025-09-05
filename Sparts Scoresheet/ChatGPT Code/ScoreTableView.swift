@@ -13,23 +13,53 @@ struct Player {
     var took: Int
 }
 
+// Extend IncrementingCell and CheckboxCell with style properties
 struct IncrementingCell {
     var x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat
     var value: Int
     var set: Bool = true
     var min: Int = 0, max: Int = 0
     var wrap: Bool = false
+    var fontSize: CGFloat = 0
+    var hasSet: Bool = false
+    
+    // Style props
+    var colBg: Color? = nil
+    var colBgPressed: Color? = nil
+    var colStroke: Color? = nil
+    var colText: Color? = nil
+    var colTextUnset: Color? = nil
 }
 
 struct CheckboxCell {
     var x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat
     var value: Bool
+    
+    // Style props
+    var colBg: Color? = nil
+    var colBgPressed: Color? = nil
+    var colStroke: Color? = nil
+    var colTick: Color? = nil
 }
 
 struct LongPressState {
     var pressed: Bool = false
     var start: Date? = nil
     var fired: Bool = false
+}
+
+// New file or next to ScoreTable — minimal stub
+enum ScoreRules {
+    /// Decide if the hearts portion is "ready" for this team.
+    /// TODO: implement real logic (e.g., require an explicit hearts entry, etc.)
+    static func heartsReady(_ team: Teams) -> Bool {
+        // Stub: always false until you wire real readiness criteria
+        return false
+    }
+    static func syncHeartsMoon(_ teams: inout [Teams]) {
+            // Codea: ScoreRules.syncHeartsMoon(self.teams)
+            // SwiftUI port: no-op stub for now.
+    }
 }
 
 // MARK: - Confirm Modal Model (mirrors Codea table)
@@ -115,7 +145,6 @@ enum RIGHT {
 // --- View translated from Codea ScoreTable ---
 struct ScoreTable: View {
     var teams: [Teams]
-    var cells: [String: Any]
     var lp: [String]
     var lpThreshold: TimeInterval = 0.45
     var metrics: Metrics?
@@ -126,6 +155,9 @@ struct ScoreTable: View {
     // One state object for each entry in lp
     @State private var lpStates: [String: LongPressState] = [:]
     @State private var confirm = ConfirmModel()
+    @State private var longPressEnabled: Bool = true
+    @State private var confirmVisible: Bool = false
+    @State private var cells: [String: Any] = [:]
     
     // MARK: - Confirm handlers (Codea -> SwiftUI)
     private func confirmBackdropTapped() {
@@ -149,15 +181,6 @@ struct ScoreTable: View {
         _resetHeaderLP()
     }
     
-    // MARK: - Stubs (filled in later)
-    private func _resetHeaderLP() {
-        // TODO: reset any long-press tracking you need
-    }
-
-    private func _clearEntireHand() {
-        // TODO: clear all the data in this table
-    }
-    
     // MARK: - New helpers (add inside ScoreTable)
     mutating func setLPFrame(_ key: String, _ rect: CGRect) {
         lpFrames[key] = rect
@@ -173,10 +196,6 @@ struct ScoreTable: View {
         } else {
             // Unknown key/type; ignore
         }
-    }
-
-    func applyNumberFontSize() {
-        // placeholder for now; hook into your text rendering later
     }
 
     init(teams: [Teams]) {
@@ -351,8 +370,231 @@ struct ScoreTable: View {
         applyNumberFontSize()                    // self:_applyNumberFontSize()
     }
 
+    // Direct line-by-line analog to setLongPressEnabled(on)
+    func setLongPressEnabled(_ on: Bool = true) {
+        longPressEnabled = on
+        if !on {
+            // Reset per-key LP state exactly like the Codea loop
+            for key in lp {
+                lpStates[key] = LongPressState()  // pressed=false, start=nil, fired=false
+            }
+        }
+    }
+    
+    func _promptClearHand() {
+        confirmVisible = true
+    }
+    
+    // Helper to mutate a typed cell stored as Any
+    private mutating func _mutateCell<T>(_ key: String, as _: T.Type, _ body: (inout T) -> Void) {
+        guard var val = cells[key] as? T else { return }
+        body(&val)
+        cells[key] = val
+    }
+
+    // Direct translation of _clearPlayer(...)
+    mutating func _clearPlayer(teamIndex: Int, playerIndex: Int) {
+        switch (teamIndex, playerIndex) {
+        case (1, 1):
+            _resetCellToUnset("t1_p1_bid")
+            _resetCellToUnset("t1_p1_took")
+            _resetCellToUnset("t1_hearts")
+            _mutateCell("t1_qs",   as: CheckboxCell.self) { $0.value = false }
+            _mutateCell("t1_moon", as: CheckboxCell.self) { $0.value = false }
+
+        case (1, 2):
+            _resetCellToUnset("t1_p2_bid")
+            _resetCellToUnset("t1_p2_took")
+            _resetCellToUnset("t1_hearts")
+            _mutateCell("t1_qs",   as: CheckboxCell.self) { $0.value = false }
+            _mutateCell("t1_moon", as: CheckboxCell.self) { $0.value = false }
+
+        case (2, 1):
+            _resetCellToUnset("t2_p1_bid")
+            _resetCellToUnset("t2_p1_took")
+            _resetCellToUnset("t2_hearts")
+            _mutateCell("t2_qs",   as: CheckboxCell.self) { $0.value = false }
+            _mutateCell("t2_moon", as: CheckboxCell.self) { $0.value = false }
+
+        case (2, 2):
+            _resetCellToUnset("t2_p2_bid")
+            _resetCellToUnset("t2_p2_took")
+            _resetCellToUnset("t2_hearts")
+            _mutateCell("t2_qs",   as: CheckboxCell.self) { $0.value = false }
+            _mutateCell("t2_moon", as: CheckboxCell.self) { $0.value = false }
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Codea → SwiftUI translations
+
+    // ScoreTable:_resetHeaderLP()
+    private func _resetHeaderLP() {
+        guard lpStates.keys.contains("headerTeam") else { return }
+        lpStates["headerTeam"] = LongPressState() // pressed=false, start=nil, fired=false
+    }
+
+    // ScoreTable:_clearEntireHand()
+    private func _clearEntireHand() {
+        // bids & tooks
+        _resetCellToUnset("t1_p1_bid")
+        _resetCellToUnset("t1_p1_took")
+        _resetCellToUnset("t1_p2_bid")
+        _resetCellToUnset("t1_p2_took")
+        _resetCellToUnset("t2_p1_bid")
+        _resetCellToUnset("t2_p1_took")
+        _resetCellToUnset("t2_p2_bid")
+        _resetCellToUnset("t2_p2_took")
+
+        // hearts
+        _resetCellToUnset("t1_hearts")
+        _resetCellToUnset("t2_hearts")
+
+        // checkboxes
+        if var qs = cells["t1_qs"] as? CheckboxCell { qs.value = false; cells["t1_qs"] = qs }
+        if var mn = cells["t1_moon"] as? CheckboxCell { mn.value = false; cells["t1_moon"] = mn }
+        if var qs = cells["t2_qs"] as? CheckboxCell { qs.value = false; cells["t2_qs"] = qs }
+        if var mn = cells["t2_moon"] as? CheckboxCell { mn.value = false; cells["t2_moon"] = mn }
+    }
+
+    // Helper used above in Codea: _resetCellToUnset(cell)
+    // Swift version works by key since we store cells in a dictionary.
+    private func _resetCellToUnset(_ key: String) {
+        if var inc = cells[key] as? IncrementingCell {
+            // mimic “unset” — pick whatever semantics you prefer:
+            inc.value = 0
+            inc.set = false
+            cells[key] = inc
+        }
+    }
+    
+    // Stub — in SwiftUI we don’t manually set frames or sensors this way.
+    private func setCellFrame(_ key: String, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
+        if var inc = cells[key] as? IncrementingCell {
+            inc.x = x; inc.y = y; inc.w = w; inc.h = h
+            cells[key] = inc
+        } else if var cb = cells[key] as? CheckboxCell {
+            cb.x = x; cb.y = y; cb.w = w; cb.h = h
+            cells[key] = cb
+        }
+    }
+    
+    private func applyNumberFontSize() {
+        for (key, value) in cells {
+            if var inc = value as? IncrementingCell, inc.set {
+                // Add a fontSize property to IncrementingCell if it doesn’t exist yet
+                inc.fontSize = numberFontSize
+                cells[key] = inc
+            }
+        }
+    }
+    
+    // Paste inside ScoreTable (method or private extension)
+    func _spadesReady(teamIndex: Int) -> Bool {
+        let prefix = (teamIndex == 1) ? "t1" : "t2"
+        // Pull the four left-side incrementing cells for that team
+        guard
+            let p1_bid  = cells["\(prefix)_p1_bid"]  as? IncrementingCell,
+            let p1_took = cells["\(prefix)_p1_took"] as? IncrementingCell,
+            let p2_bid  = cells["\(prefix)_p2_bid"]  as? IncrementingCell,
+            let p2_took = cells["\(prefix)_p2_took"] as? IncrementingCell
+        else {
+            return false
+        }
+
+        func bidReady(_ bidCell: IncrementingCell) -> Bool {
+            return (bidCell.value == 0) || bidCell.hasSet
+        }
+
+        func tookReady(_ tookCell: IncrementingCell) -> Bool {
+            return tookCell.hasSet
+        }
+
+        return bidReady(p1_bid) && bidReady(p2_bid) && tookReady(p1_took) && tookReady(p2_took)
+    }
+    
+    // Inside ScoreTable
+    func _heartsReady(teamIndex: Int) -> Bool {
+        // Codea uses 1-based indexing; keep that here.
+        let i = teamIndex - 1
+        guard teams.indices.contains(i) else { return false }
+        return ScoreRules.heartsReady(teams[i])
+    }
+    
+    // Inside ScoreTable or as a separate struct
+    @ViewBuilder
+    func _cell(x: CGFloat,
+               y: CGFloat,
+               w: CGFloat,
+               h: CGFloat,
+               bg: Color,
+               txt: String? = nil,
+               txtCol: Color = Theme.textOnLight,
+               fsz: CGFloat? = nil) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(bg)
+                .overlay(Rectangle().stroke(Theme.gridLine, lineWidth: 1))
+
+            if let text = txt {
+                Text(text)
+                    .font(.system(size: fsz ?? (h * 0.45), weight: .bold))
+                    .foregroundColor(txtCol)
+                    .multilineTextAlignment(.center)
+                    .frame(width: w, height: h)
+            }
+        }
+        .frame(width: w, height: h)
+        .position(x: x + w/2, y: y + h/2)
+    }
+    
+    mutating func _skinInputs() {
+        for (k, v) in cells {
+            if var cell = v as? IncrementingCell, cell.set {
+                cell.colBg        = Theme.cellBg
+                cell.colBgPressed = Theme.cellBgPressed
+                cell.colStroke    = Theme.gridLine
+                cell.colText      = Theme.textAccentBlue
+                cell.colTextUnset = Theme.textDisabled
+                cells[k] = cell
+            } else if var check = v as? CheckboxCell {
+                check.colBg        = Theme.cellBg
+                check.colBgPressed = Theme.cellBgPressed
+                check.colStroke    = Theme.gridLine
+                check.colTick      = Theme.checkboxTick
+                cells[k] = check
+            }
+        }
+    }
+    
     var body: some View {
         EmptyView() // intentionally does nothing (per your request)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+    }
+    
+    private func _syncHeartsCellsFromTeams() {
+        // Codea: self:_syncHeartsCellsFromTeams()
+        // SwiftUI port: no-op stub for now.
     }
 }
 

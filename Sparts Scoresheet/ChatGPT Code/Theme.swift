@@ -39,4 +39,5 @@ enum Theme {
 
     static let resetAllBg      = Color(red: 0.35, green: 0.35, blue: 0.39) // fixed “Reset All”
     static let newHandBg       = Color(red: 0.16, green: 0.63, blue: 1.0)  // fixed “New Hand”
+    static let checkboxTick = Color(red: 0.0, green: 0.6, blue: 0.0) // adjust as needed
 }
