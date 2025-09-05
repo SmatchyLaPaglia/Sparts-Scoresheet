@@ -680,12 +680,33 @@ struct ScoreTable: View {
         }
     }
     
+    // Aliases for the Codea "local m = self.metrics ..."
+    // Returns nil until layout() has run.
+    // Aliases for the Codea "local m = self.metrics ..."
+    private func metricsAliases()
+    -> (m: Metrics, innerX: CGFloat, wName: CGFloat, wNarrow: CGFloat,
+        wHearts: CGFloat, wScore: CGFloat, gapW: CGFloat) {
+        let m = metrics
+        return (m, m.innerX, m.wName, m.wNarrow, m.wHearts, m.wScore, m.gapW)
+    }
+    
     var body: some View {
         EmptyView()
             .onAppear {
                 selfLayout()
                 _skinInputs()
             }
+        //    not translated bc data binding obsoletes syncing
+        //    self:syncBack()
+        //    ScoreRules.syncHeartsMoon(self.teams)
+        //    self:_syncHeartsCellsFromTeams()
+
+        //moved outside of this method: Codea convenience assignments of variables in the metrics table
+        
+        
+        
+        
+        
         
         
         
