@@ -85,8 +85,8 @@ struct NotchSafeView<Content: View>: View {
                 // Draw our base panel ONLY when no custom content was provided
                 if shouldDrawBasePanel {
                     Rectangle()
-                        .fill(Theme.leftHeaderBg)
-                        .overlay(Rectangle().stroke(Theme.gridLine, lineWidth: 1))
+                        .fill(Theme.nameStripeLight)
+                        .overlay(Rectangle().stroke(Theme.leftHeaderBg, lineWidth: 1))
                         .frame(width: safeRect.width, height: safeRect.height)
                         .position(x: safeRect.midX, y: safeRect.midY)
                 }

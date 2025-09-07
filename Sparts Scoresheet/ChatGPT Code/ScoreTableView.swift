@@ -145,6 +145,7 @@ enum RIGHT {
 
 // --- View translated from Codea ScoreTable ---
 struct ScoreTable: View {
+    
     var teams: [Teams]
     var lp: [String]
     var lpThreshold: TimeInterval = 0.45
@@ -185,6 +186,66 @@ struct ScoreTable: View {
     // MARK: - New helpers (add inside ScoreTable)
     private func setLPFrame(_ key: String, _ rect: CGRect) {
         lpFrames[key] = rect
+    }
+    
+    @Environment(\.displayScale) private var displayScale
+
+    @inline(__always)
+    private func px(_ v: CGFloat) -> CGFloat { (v * displayScale).rounded() / displayScale }
+    
+    @ViewBuilder
+    func headerSectionCanvas(size: CGSize) -> some View {
+        let m = selfLayout(size)               // your existing layout -> Metrics
+        let handGroupW  = m.wScore * 3
+        let totalGroupW = m.wScore * 3
+        let grandGroupW = m.wScore * 1
+
+        let headerFont = min(
+            fitFontSize("TEAMS",         m.wName - 10,          m.leftHeaderH - 8, lines: 1),
+            fitFontSize("SPADES",        m.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+            fitFontSize("HEARTS",        m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+            fitFontSize("Hand\nScores",  handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
+            fitFontSize("Total\nScores", totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
+            fitFontSize("Grand\nTotal",  grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
+        )
+
+        Canvas { ctx, _ in
+            func drawCell(x: CGFloat, w: CGFloat, label: String?) {
+                let r = CGRect(
+                    x: px(x),
+                    y: px(m.headY),
+                    width: px(w),
+                    height: px(m.leftHeaderH)
+                ).integral
+
+                // fill + 1pt stroke (exactly like Codea)
+                ctx.fill(Path(r), with: .color(Theme.leftHeaderBg))
+                ctx.stroke(Path(r), with: .color(Theme.gridLine), lineWidth: 1)
+
+                guard let label = label else { return }
+
+                var att = AttributedString(label)
+                att.font = .custom("HelveticaNeue-Bold", size: headerFont)
+                att.foregroundColor = Theme.leftHeaderText
+
+                // Center the text in the rect (Canvas handles this reliably)
+                ctx.draw(Text(att), in: r)
+            }
+
+            var x = m.innerX
+            // LEFT titles
+            drawCell(x: x,                     w: m.wName,        label: "TEAMS");          x += m.wName
+            drawCell(x: x,                     w: m.wNarrow * 3,  label: "SPADES");         x += m.wNarrow * 3
+            drawCell(x: x,                     w: m.wHearts * 3,  label: "HEARTS");         x += m.wHearts * 3
+            if m.gapW > 0 { drawCell(x: x,     w: m.gapW,         label: nil);              x += m.gapW }
+            // RIGHT group titles
+            drawCell(x: x,                     w: handGroupW,     label: "HAND\nSCORES");   x += handGroupW
+            drawCell(x: x,                     w: totalGroupW,    label: "TOTAL\nSCORES");  x += totalGroupW
+            drawCell(x: x,                     w: grandGroupW,    label: "GRAND\nTOTAL")
+        }
+        .allowsHitTesting(false)
+        .dynamicTypeSize(.medium)   // lock text so it doesn’t auto-scale
+        .ignoresSafeArea()          // we’re using your own safe-area math already
     }
 
     private func setCellFrame(key: String, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
@@ -689,44 +750,308 @@ struct ScoreTable: View {
         let m = metrics
         return (m, m.innerX, m.wName, m.wNarrow, m.wHearts, m.wScore, m.gapW)
     }
+
+    func fitFontSize(_ text: String, _ maxW: CGFloat, _ maxH: CGFloat, lines: Int = 1) -> CGFloat {
+        let lines = max(1, lines)
+        var trySize: CGFloat = (maxH / CGFloat(lines)) * 0.9
+        let minSz: CGFloat = 8
+        let steps = 20
+
+        // mimic Codea’s unwrapped text measurement (we’ll wrap by width constraint)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.alignment = .center
+
+        let options: NSStringDrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+
+        for i in 1...steps {
+            let font = UIFont(name: "HelveticaNeue-Bold", size: trySize) ?? .boldSystemFont(ofSize: trySize)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .paragraphStyle: paragraph
+            ]
+
+            // measure within maxW; height will expand to what’s needed
+            let box = CGSize(width: maxW, height: .greatestFiniteMagnitude)
+            let rect = (text as NSString).boundingRect(with: box, options: options, attributes: attrs, context: nil)
+
+            let w = rect.width
+            let h = rect.height
+
+            if w <= maxW * 0.98 && h <= maxH * 0.98 {
+                return trySize
+            }
+
+            // Codea’s decrement: max((try - minSz)/(steps - i + 1), 0.5)
+            let dec = max((trySize - minSz) / CGFloat(steps - i + 1), 0.5)
+            trySize -= dec
+            if trySize <= minSz { break }
+        }
+        return minSz
+    }
+    
+    // Overload: choose the smallest fitting font across multiple candidates
+    func fitFontSize(_ candidates: [(String, CGFloat, CGFloat, Int)]) -> CGFloat {
+        var best = CGFloat.greatestFiniteMagnitude
+        for (text, maxW, maxH, lines) in candidates {
+            let sz = fitFontSize(text, maxW, maxH, lines: lines)
+            best = min(best, sz)
+        }
+        // If nothing ran (empty list), fall back to a sensible minimum
+        return best == .greatestFiniteMagnitude ? 8 : best
+    }
+    
+    @ViewBuilder
+    func headerSection(m: Metrics) -> some View {
+        // ---- compute outside the builder closure ----
+        let handGroupW  = m.wScore * 3
+        let totalGroupW = m.wScore * 3
+        let grandGroupW = m.wScore * 1
+
+        let headerFont = fitFontSize(
+            [
+                ("TEAMS",         m.wName - 10,           m.leftHeaderH - 8, 1),
+                ("SPADES",        m.wNarrow * 3 - 10,     m.leftHeaderH - 8, 1),
+                ("HEARTS",        m.wHearts * 3 - 10,     m.leftHeaderH - 8, 1),
+                ("Hand\nScores",  handGroupW - 10,        m.leftHeaderH - 8, 2),
+                ("Total\nScores", totalGroupW - 10,       m.leftHeaderH - 8, 2),
+                ("Grand\nTotal",  grandGroupW - 10,       m.leftHeaderH - 8, 2)
+            ]
+        )
+
+        let x0 = m.innerX
+        let x1 = x0 + m.wName
+        let x2 = x1 + m.wNarrow * 3
+        let x3 = x2 + m.wHearts * 3
+        let x4 = x3 + max(0 as CGFloat, m.gapW)
+        let x5 = x4 + handGroupW
+        let x6 = x5 + totalGroupW
+        // ---------------------------------------------
+
+        ZStack {
+            _cell(x: x0, y: m.headY, w: m.wName,        h: m.leftHeaderH,
+                  bg: Theme.leftHeaderBg, txt: "TEAMS", txtCol: Theme.leftHeaderText, fsz: headerFont)
+
+            _cell(x: x1, y: m.headY, w: m.wNarrow * 3,  h: m.leftHeaderH,
+                  bg: Theme.leftHeaderBg, txt: "SPADES", txtCol: Theme.leftHeaderText, fsz: headerFont)
+
+            _cell(x: x2, y: m.headY, w: m.wHearts * 3,  h: m.leftHeaderH,
+                  bg: Theme.leftHeaderBg, txt: "HEARTS", txtCol: Theme.leftHeaderText, fsz: headerFont)
+
+            if m.gapW > 0 {
+                _cell(x: x3, y: m.headY, w: m.gapW,     h: m.leftHeaderH,
+                      bg: Theme.leftHeaderBg, txt: nil)
+            }
+
+            _cell(x: x4, y: m.headY, w: handGroupW,     h: m.leftHeaderH,
+                  bg: Theme.leftHeaderBg, txt: "HAND\nSCORES",  txtCol: Theme.leftHeaderText, fsz: headerFont)
+
+            _cell(x: x5, y: m.headY, w: totalGroupW,    h: m.leftHeaderH,
+                  bg: Theme.leftHeaderBg, txt: "TOTAL\nSCORES", txtCol: Theme.leftHeaderText, fsz: headerFont)
+
+            _cell(x: x6, y: m.headY, w: grandGroupW,    h: m.leftHeaderH,
+                  bg: Theme.leftHeaderBg, txt: "GRAND\nTOTAL",  txtCol: Theme.leftHeaderText, fsz: headerFont)
+        }
+    }
+    
+    // Pure version that computes and RETURNS Metrics from a size
+    func selfLayout(_ size: CGSize) -> Metrics {
+        let safeW = size.width
+        let safeH = size.height
+        let l = layout  // your LayoutParams
+
+        // overall + inner rect
+        let overallW = safeW * l.overallWidthPercent / 100
+        let overallH = safeH * l.overallHeightPercent / 100
+        let overallX = (safeW - overallW) / 2
+        let overallY = (safeH - overallH) / 2
+        let pad = l.overallInnerPadding
+        let innerX = overallX + pad
+        let innerY = overallY + pad
+        let innerW = overallW - pad*2
+        let innerH = overallH - pad*2
+
+        // left / gap / right widths & tables height
+        let leftW  = innerW * l.leftTableWidthPercent / 100
+        let gapW   = innerW * l.gapTablesPercent      / 100
+        let rightW0 = max(0, innerW - leftW - gapW)
+        let tablesH = innerH * l.tablesHeightPercent / 100
+
+        var m = Metrics()
+
+        // Heights
+        m.leftHeaderH  = max(28, min(64, tablesH / 5))
+        m.leftRowH     = m.leftHeaderH
+        m.rightHeaderH = m.leftHeaderH
+        m.rightRowH    = m.leftRowH
+
+        // Column widths
+        m.wName   = leftW * LeftCols.nameFrac
+        m.wNarrow = leftW * LeftCols.narrowFrac
+        m.wHearts = leftW * LeftCols.heartsFrac
+        m.wScore  = rightW0 / CGFloat(RIGHT.cols)
+
+        // Anchors
+        m.innerX = innerX
+        m.innerY = innerY
+        m.leftW  = leftW
+        m.gapW   = gapW
+        m.rightW = rightW0
+        m.tablesH = tablesH
+
+        // Y positions
+        m.headY         = innerY + tablesH - m.leftHeaderH
+        m.yAfterHeadGap = m.headY - l.headerGap
+        m.t1_row1       = m.yAfterHeadGap - m.leftRowH
+        m.t1_row2       = m.t1_row1 - m.leftRowH
+        m.t2_row1       = m.t1_row2 - l.teamGap - m.leftRowH
+        m.t2_row2       = m.t2_row1 - m.leftRowH
+
+        // Take one score-column from the right table to widen the name column
+        let bumpW = m.wScore
+        m.wName   += bumpW
+        m.leftW   += bumpW
+        m.rightW  -= bumpW
+        m.wScore   = m.rightW / CGFloat(RIGHT.cols)
+
+        return m
+    }
     
     var body: some View {
-        EmptyView()
-            .onAppear {
-                selfLayout()
-                _skinInputs()
-            }
-        //    not translated bc data binding obsoletes syncing
-        //    self:syncBack()
-        //    ScoreRules.syncHeartsMoon(self.teams)
-        //    self:_syncHeartsCellsFromTeams()
-
-        //moved outside of this method: Codea convenience assignments of variables in the metrics table
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+        GeometryReader { geo in
+            headerSectionCanvas(size: geo.size)
+        }
+        .background(Color.black.opacity(0.001)) // keeps hit-testing sane; no padding
     }
+    
+    
+    
+//    var body: some View {
+//        EmptyView()
+//            .onAppear {
+//                selfLayout()
+//                _skinInputs()
+//            }
+//        //    not translated bc data binding obsoletes syncing
+//        //    self:syncBack()
+//        //    ScoreRules.syncHeartsMoon(self.teams)
+//        //    self:_syncHeartsCellsFromTeams()
+//
+//        //moved outside of this method: Codea convenience assignments of variables in the metrics table
+//        
+//        // --- widths for right-side groups
+//        let a = metricsAliases()
+//        let m = a.m
+//
+//        let handGroupW: CGFloat  = a.wScore * 3
+//        let totalGroupW: CGFloat = a.wScore * 3
+//        let grandGroupW: CGFloat = a.wScore * 1
+//
+//        // --- find a font that fits all header cells
+//        let headerFont: CGFloat = [
+//            fitFontSize("TEAMS",        m.wName - 10,          m.leftHeaderH - 8, lines: 1),
+//            fitFontSize("SPADES",       a.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+//            fitFontSize("HEARTS",       m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+//            fitFontSize("Hand\nScores", handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
+//            fitFontSize("Total\nScores",totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
+//            fitFontSize("Grand\nTotal", grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
+//        ].min() ?? 12
+//        
+//        let x0 = m.innerX
+//
+//        Group {
+//            // LEFT section titles
+//            _cell(x: x0,
+//                  y: m.headY,
+//                  w: m.wName,
+//                  h: m.leftHeaderH,
+//                  bg: Theme.leftHeaderBg,
+//                  txt: "TEAMS",
+//                  txtCol: Theme.leftHeaderText,
+//                  fsz: headerFont)
+//
+//            _cell(x: x0 + m.wName,
+//                  y: m.headY,
+//                  w: m.wNarrow * 3,
+//                  h: m.leftHeaderH,
+//                  bg: Theme.leftHeaderBg,
+//                  txt: "SPADES",
+//                  txtCol: Theme.leftHeaderText,
+//                  fsz: headerFont)
+//
+//            _cell(x: x0 + m.wName + m.wNarrow * 3,
+//                  y: m.headY,
+//                  w: m.wHearts * 3,
+//                  h: m.leftHeaderH,
+//                  bg: Theme.leftHeaderBg,
+//                  txt: "HEARTS",
+//                  txtCol: Theme.leftHeaderText,
+//                  fsz: headerFont)
+//
+//            if m.gapW > 0 {
+//                _cell(x: x0 + m.wName + m.wNarrow * 3 + m.wHearts * 3,
+//                      y: m.headY,
+//                      w: m.gapW,
+//                      h: m.leftHeaderH,
+//                      bg: Theme.leftHeaderBg,
+//                      txt: nil)
+//            }
+//
+//            // RIGHT group titles
+//            let xRightStart = x0 + m.wName + m.wNarrow * 3 + m.wHearts * 3 + max(0 as CGFloat, m.gapW)
+//
+//            _cell(x: xRightStart,
+//                  y: m.headY,
+//                  w: handGroupW,
+//                  h: m.leftHeaderH,
+//                  bg: Theme.leftHeaderBg,
+//                  txt: "HAND\nSCORES",
+//                  txtCol: Theme.leftHeaderText,
+//                  fsz: headerFont)
+//
+//            _cell(x: xRightStart + handGroupW,
+//                  y: m.headY,
+//                  w: totalGroupW,
+//                  h: m.leftHeaderH,
+//                  bg: Theme.leftHeaderBg,
+//                  txt: "TOTAL\nSCORES",
+//                  txtCol: Theme.leftHeaderText,
+//                  fsz: headerFont)
+//
+//            _cell(x: xRightStart + handGroupW + totalGroupW,
+//                  y: m.headY,
+//                  w: grandGroupW,
+//                  h: m.leftHeaderH,
+//                  bg: Theme.leftHeaderBg,
+//                  txt: "GRAND\nTOTAL",
+//                  txtCol: Theme.leftHeaderText,
+//                  fsz: headerFont)
+//        }
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//        
+//    }
     
     private func _syncHeartsCellsFromTeams() {
         // Codea: self:_syncHeartsCellsFromTeams()
