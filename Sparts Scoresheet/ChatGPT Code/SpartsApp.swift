@@ -17,7 +17,8 @@ struct SpartsApp: App {
                 Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)], hearts: 0, queensSpades: false, moonShot: false),
                 Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)], hearts: 0, queensSpades: false, moonShot: false)
             ]
-            return ScoreTable(teams: teams)        }
+            return ScoreTable(teams: teams)
+        }
     }
 }
 

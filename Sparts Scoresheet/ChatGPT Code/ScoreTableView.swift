@@ -917,11 +917,18 @@ struct ScoreTable: View {
         return m
     }
     
+    // REPLACE this whole var body
     var body: some View {
         GeometryReader { geo in
-            headerSectionCanvas(size: geo.size)
+            DesignSpaceInRect(
+                designSize: CGSize(width: 1000, height: 600),   // your logical canvas
+                containerSize: geo.size                         // actual safe rect size
+            ) { design in
+                // Draw the real element in *design* coords
+                headerSectionCanvas(size: design)
+                    .frame(width: design.width, height: design.height, alignment: .topLeading)
+            }
         }
-        .background(Color.black.opacity(0.001)) // keeps hit-testing sane; no padding
     }
     
     

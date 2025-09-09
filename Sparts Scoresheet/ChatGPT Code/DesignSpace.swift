@@ -1,7 +1,17 @@
 import SwiftUI
 
-import SwiftUI
+enum DSScaleMode { case fit, fillWidth, fillHeight, stretch }
 
+private func dsScale(_ container: CGSize, _ design: CGSize, _ mode: DSScaleMode) -> (x: CGFloat, y: CGFloat) {
+    let sx = container.width  / design.width
+    let sy = container.height / design.height
+    switch mode {
+    case .fit:        let u = min(sx, sy); return (u, u)
+    case .fillWidth:  return (sx, sx)
+    case .fillHeight: return (sy, sy)
+    case .stretch:    return (sx, sy)
+    }
+}
 struct PercentCanvas<Content: View>: View {
     let size: CGSize                    // usually safeRect.size
     @ViewBuilder var content: (CGSize) -> Content
@@ -64,19 +74,28 @@ struct CellView: View {
 
 import SwiftUI
 
+// CHANGE signature
+// CHANGE signature
 struct DesignSpaceInRect<Content: View>: View {
-    let designSize: CGSize          // your logical canvas (e.g. 1000x600)
-    let containerSize: CGSize       // the safeRect.size from NotchSafeView
-    @ViewBuilder var content: (CGSize) -> Content  // gets designSize coords
-
+    let designSize: CGSize
+    let containerSize: CGSize
+    var showGrid: Bool = false
+    var gridDivs: Int = 20
+    var scaleMode: DSScaleMode = .fit      // ← NEW
+    @ViewBuilder var content: (CGSize) -> Content
+    
     var body: some View {
-        let scale = min(containerSize.width / designSize.width,
-                        containerSize.height / designSize.height)
-
+        let s = dsScale(containerSize, designSize, scaleMode)
         ZStack(alignment: .topLeading) {
+            if showGrid {
+                DesignGrid(size: designSize, step: designSize.width / CGFloat(gridDivs))
+                    .allowsHitTesting(false)
+                    .frame(width: designSize.width, height: designSize.height, alignment: .topLeading)
+                .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
+            }
             content(designSize) // draw in *design* coords, top-left origin
                 .frame(width: designSize.width, height: designSize.height, alignment: .topLeading)
-                .scaleEffect(scale, anchor: .topLeading)
+                .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
         }
         .frame(width: containerSize.width, height: containerSize.height, alignment: .topLeading)
     }
@@ -85,31 +104,49 @@ struct DesignSpaceInRect<Content: View>: View {
 // MARK: - DesignSpace
 /// A fixed logical canvas (e.g. 1000x600) that is scaled to fit the device,
 /// centered, and keeps a top-left origin to match Codea math.
+// CHANGE signature & init
+// CHANGE signature & init additions
 struct DesignSpace<Content: View>: View {
     let designSize: CGSize
+    var showGrid: Bool = false
+    var gridDivs: Int = 20
+    var scaleMode: DSScaleMode = .fit          // ← NEW
     @ViewBuilder var content: (CGSize) -> Content
 
-    init(designSize: CGSize, @ViewBuilder content: @escaping (CGSize) -> Content) {
+    init(designSize: CGSize,
+         showGrid: Bool = false,
+         gridDivs: Int = 20,
+         scaleMode: DSScaleMode = .fit,        // ← NEW
+         @ViewBuilder content: @escaping (CGSize) -> Content) {
         self.designSize = designSize
+        self.showGrid = showGrid
+        self.gridDivs = gridDivs
+        self.scaleMode = scaleMode
         self.content = content
     }
 
     var body: some View {
         GeometryReader { geo in
             let safe = geo.size
-            let scale = min(safe.width / designSize.width,
-                            safe.height / designSize.height)
-            let canvasW = designSize.width * scale
-            let canvasH = designSize.height * scale
+            let s = dsScale(safe, designSize, scaleMode)
+            let canvasW = designSize.width  * s.x
+            let canvasH = designSize.height * s.y
             let originX = (safe.width  - canvasW) / 2
             let originY = (safe.height - canvasH) / 2
 
             ZStack(alignment: .topLeading) {
                 Color.clear
-
+                // INSERT inside the inner ZStack(alignment: .topLeading), before `content(designSize)`
+                if showGrid {
+                    DesignGrid(size: designSize, step: designSize.width / CGFloat(gridDivs))
+                        .allowsHitTesting(false)
+                        .frame(width: designSize.width, height: designSize.height, alignment: .topLeading)
+                    .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
+                    .offset(x: originX, y: originY)
+                }
                 content(designSize) // <- all drawing uses *design* coords
                     .frame(width: designSize.width, height: designSize.height, alignment: .topLeading)
-                    .scaleEffect(scale, anchor: .topLeading)
+                    .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
                     .offset(x: originX, y: originY) // center the scaled canvas
             }
             .frame(width: safe.width, height: safe.height, alignment: .topLeading)
@@ -188,23 +225,31 @@ struct DesignSpaceProof: View {
     NotchSafeView(heightPercent: 100,
                   paddingPercentNotchSide: 0,
                   paddingPercentSideOppositeNotch: 0) { safeRect in
-        PercentCanvas(size: safeRect.size) { size in
-            // DEBUG outline: should hug the purple panel exactly
-            Rectangle().stroke(.red, lineWidth: 2)
-                .frame(width: size.width, height: size.height)
 
-            // Proofs:
-            let cw = size.width * 0.10
-            let ch = size.height * 0.08
+        // REPLACE this whole PercentCanvas{...} with:
+        DesignSpaceInRect(
+            designSize: CGSize(width: 1000, height: 600),
+            containerSize: safeRect.size,
+            showGrid: true,
+            gridDivs: 20,
+            scaleMode: .stretch
+        ) { design in
+            // DEBUG outline around the full design canvas
+            Rectangle().stroke(.red, lineWidth: 2)
+                .frame(width: design.width, height: design.height, alignment: .topLeading)
+
+            // Proofs now use *design* coords (device-independent)
+            let cw = design.width * 0.10
+            let ch = design.height * 0.08
 
             // (50%, 50%) centered
-            let cx = DS.px(50, in: size) - cw/2
-            let cy = DS.py(50, in: size) - ch/2
+            let cx = DS.px(50, in: design) - cw/2
+            let cy = DS.py(50, in: design) - ch/2
             CellView(x: cx, y: cy, w: cw, h: ch, bg: .clear, txt: "CENTER")
 
             // (0%, 50%) left-middle
-            let lx = DS.px(0, in: size)
-            let ly = DS.py(50, in: size) - ch/2
+            let lx = DS.px(0, in: design)
+            let ly = DS.py(50, in: design) - ch/2
             CellView(x: lx, y: ly, w: cw, h: ch, bg: .clear, txt: "LEFT MID")
         }
     }

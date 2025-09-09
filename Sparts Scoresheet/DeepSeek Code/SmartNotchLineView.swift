@@ -262,8 +262,8 @@ struct NotchLineView: View {
 // Utility functions for notch detection
 struct NotchDetection {
     static func detectBothNotchPositions(safeAreaInsets: EdgeInsets, screenWidth: CGFloat) -> (left: CGFloat, right: CGFloat) {
-        let leftPosition = safeAreaInsets.leading > 0 ? safeAreaInsets.leading + 2 : 44 + 2
-        let rightPosition = safeAreaInsets.trailing > 0 ? screenWidth - safeAreaInsets.trailing + 2 : screenWidth - 44 + 2
+        let leftPosition = safeAreaInsets.leading > 0 ? safeAreaInsets.leading + 2 : 62 + 2
+        let rightPosition = safeAreaInsets.trailing > 0 ? screenWidth - safeAreaInsets.trailing + 2 : screenWidth - 62 + 2
         return (leftPosition, rightPosition)
     }
     
@@ -280,3 +280,5 @@ struct NotchDetection {
     }
 }
 
+// MARK: - OrientationManager (Keep this from your existing code)
+// ... Your existing OrientationManager class goes here ...
