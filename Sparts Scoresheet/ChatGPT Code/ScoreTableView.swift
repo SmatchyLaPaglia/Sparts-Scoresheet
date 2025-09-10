@@ -75,7 +75,7 @@ struct ConfirmModel {
 
 // MARK: - Layout params used by layout(...)
 struct LayoutParams {
-    var overallWidthPercent: CGFloat       // e.g. 92
+    var overallWidthPercent: CGFloat       // e.g. 20
     var overallHeightPercent: CGFloat      // e.g. 60
     var overallInnerPadding: CGFloat       // pts
     var leftTableWidthPercent: CGFloat     // e.g. 62
@@ -86,7 +86,7 @@ struct LayoutParams {
 
     static var `default`: LayoutParams {
         LayoutParams(
-            overallWidthPercent: 92,
+            overallWidthPercent: 100,
             overallHeightPercent: 60,
             overallInnerPadding: 8,
             leftTableWidthPercent: 62,
@@ -150,6 +150,7 @@ struct ScoreTable: View {
     var lp: [String]
     var lpThreshold: TimeInterval = 0.45
     var layout: LayoutParams = .default
+    var containerSizeOverride: CGSize? = nil
     
     // One state object for each entry in lp
     @State private var lpStates: [String: LongPressState] = [:]
@@ -431,116 +432,6 @@ struct ScoreTable: View {
         
         applyNumberFontSize()
     }
-//    mutating func layout(safeW: CGFloat, safeH: CGFloat) {
-//        // local safeW, safeH = WIDTH, HEIGHT
-//        // overallW/H and inner rect
-//        let overallW = safeW * layout.overallWidthPercent / 100
-//        let overallH = safeH * layout.overallHeightPercent / 100
-//        let overallX = (safeW - overallW) / 2
-//        let overallY = (safeH - overallH) / 2
-//        let pad = layout.overallInnerPadding
-//        let innerX = overallX + pad
-//        let innerY = overallY + pad
-//        let innerW = overallW - pad*2
-//        let innerH = overallH - pad*2
-//
-//        // left / gap / right widths & tables height
-//        let leftW  = innerW * layout.leftTableWidthPercent / 100
-//        let gapW   = innerW * layout.gapTablesPercent      / 100
-//        let rightW = max(0, innerW - leftW - gapW)
-//        let tablesH = innerH * layout.tablesHeightPercent / 100
-//
-//        // self.metrics = self.metrics or {}
-//        // local m = self.metrics
-//        if metrics == nil { metrics = Metrics() }
-//        var m = metrics!
-//
-//        // -- Heights
-//        m.leftHeaderH  = max(28, min(64, tablesH / 5))
-//        m.leftRowH     = m.leftHeaderH
-//        m.rightHeaderH = m.leftHeaderH
-//        // right table rows should match left table row height (no double height)
-//        m.rightRowH    = m.leftRowH
-//
-//        // -- Column widths
-//        m.wName   = leftW * LeftCols.nameFrac
-//        m.wNarrow = leftW * LeftCols.narrowFrac
-//        m.wHearts = leftW * LeftCols.heartsFrac
-//        m.wScore  = rightW / CGFloat(RIGHT.cols)
-//
-//        // -- Anchors
-//        m.innerX = innerX
-//        m.innerY = innerY
-//        m.leftW  = leftW
-//        m.gapW   = gapW
-//        m.rightW = rightW
-//        m.tablesH = tablesH
-//
-//        // -- Y positions
-//        m.headY         = innerY + tablesH - m.leftHeaderH
-//        m.yAfterHeadGap = m.headY - layout.headerGap
-//        m.t1_row1       = m.yAfterHeadGap - m.leftRowH
-//        m.t1_row2       = m.t1_row1 - m.leftRowH
-//        m.t2_row1       = m.t1_row2 - layout.teamGap - m.leftRowH
-//        m.t2_row2       = m.t2_row1 - m.leftRowH
-//
-//        self.numberFontSize = m.leftRowH * 0.5
-//
-//        // -- Take one score-column from the right table to widen the name column
-//        let bumpW = m.wScore                // width of one right-table column
-//        m.wName   = m.wName + bumpW         // widen the TEAM/PLAYER name column
-//        m.leftW   = m.leftW + bumpW         // shift the boundary between left and right tables
-//        m.rightW  = m.rightW - bumpW        // shrink right table to keep total width consistent
-//        m.wScore  = m.rightW / CGFloat(RIGHT.cols)  // recompute per-column width on the right
-//
-//        // -- Base X helpers
-//        let x_afterLabel = m.innerX + m.wName + m.wNarrow        // after "bid/took"
-//        let x_heartsCol  = m.innerX + m.wName + m.wNarrow * 3
-//        let x_qsCol      = x_heartsCol + m.wHearts
-//        let x_moonCol    = x_heartsCol + m.wHearts * 2
-//
-//        // -- Name cell rectangles
-//        func nameRect(_ y: CGFloat) -> CGRect {
-//            CGRect(x: m.innerX, y: y, width: m.wName, height: m.leftRowH)
-//        }
-//        setLPFrame("t1_p1_name", nameRect(m.t1_row1))
-//        setLPFrame("t1_p2_name", nameRect(m.t1_row2))
-//        setLPFrame("t2_p1_name", nameRect(m.t2_row1))
-//        setLPFrame("t2_p2_name", nameRect(m.t2_row2))
-//
-//        // -- TEAMS header cell rectangle
-//        setLPFrame(
-//            "headerTeam",
-//            CGRect(x: m.innerX, y: m.headY, width: m.wName, height: m.leftHeaderH)
-//        )
-//
-//        // -- Team 1, player 1 (top row)
-//        setCellFrame(key: "t1_p1_bid",   x: x_afterLabel,             y: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
-//        setCellFrame(key: "t1_p1_took",  x: x_afterLabel + m.wNarrow, y: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
-//
-//        // -- Team 1, player 2 (bottom row)
-//        setCellFrame(key: "t1_p2_bid",   x: x_afterLabel,             y: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
-//        setCellFrame(key: "t1_p2_took",  x: x_afterLabel + m.wNarrow, y: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
-//        setCellFrame(key: "t1_hearts",   x: x_heartsCol,              y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
-//        setCellFrame(key: "t1_qs",       x: x_qsCol,                  y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
-//        setCellFrame(key: "t1_moon",     x: x_moonCol,                y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
-//
-//        // -- Team 2, player 1 (top row)
-//        setCellFrame(key: "t2_p1_bid",   x: x_afterLabel,             y: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
-//        setCellFrame(key: "t2_p1_took",  x: x_afterLabel + m.wNarrow, y: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
-//
-//        // -- Team 2, player 2 (bottom row)
-//        setCellFrame(key: "t2_p2_bid",   x: x_afterLabel,             y: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
-//        setCellFrame(key: "t2_p2_took",  x: x_afterLabel + m.wNarrow, y: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
-//        setCellFrame(key: "t2_hearts",   x: x_heartsCol,              y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
-//        setCellFrame(key: "t2_qs",       x: x_qsCol,                  y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
-//        setCellFrame(key: "t2_moon",     x: x_moonCol,                y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
-//
-//        self.numberFontSize = m.leftRowH * 0.5   // (match Codea placement)
-//        self.metrics = m                         // write back
-//        
-//        applyNumberFontSize()
-//    }
 
     // Direct line-by-line analog to setLongPressEnabled(on)
     func setLongPressEnabled(_ on: Bool = true) {
@@ -917,148 +808,79 @@ struct ScoreTable: View {
         return m
     }
     
-    // REPLACE this whole var body
+    private func headerRow(in design: CGSize) -> some View {
+        // 1) compute layout from the design size
+        let m = selfLayout(design)
+
+        // 2) widths for right-side groups
+        let handGroupW  = m.wScore * 3
+        let totalGroupW = m.wScore * 3
+        let grandGroupW = m.wScore * 1
+
+        // 3) font that fits *all* header cells (as in Codea)
+        let headerFont = min(
+            fitFontSize("TEAMS",         m.wName - 10,          m.leftHeaderH - 8, lines: 1),
+            fitFontSize("SPADES",        m.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+            fitFontSize("HEARTS",        m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+            fitFontSize("Hand\nScores",  handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
+            fitFontSize("Total\nScores", totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
+            fitFontSize("Grand\nTotal",  grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
+        )
+
+        // 4) build the sequence (exact Codea flow)
+        var seq: [(x: CGFloat, w: CGFloat, label: String?)] = []
+        var x = m.innerX
+        seq.append((x, m.wName,        "TEAMS"));            x += m.wName
+        seq.append((x, m.wNarrow * 3,  "SPADES"));           x += m.wNarrow * 3
+        seq.append((x, m.wHearts * 3,  "HEARTS"));           x += m.wHearts * 3
+        if m.gapW > 0 { seq.append((x, m.gapW, nil));        x += m.gapW }
+        seq.append((x, handGroupW,     "HAND\nSCORES"));     x += handGroupW
+        seq.append((x, totalGroupW,    "TOTAL\nSCORES"));    x += totalGroupW
+        seq.append((x, grandGroupW,    "GRAND\nTOTAL"))
+
+        // 5) draw
+        return ZStack(alignment: .topLeading) {
+            ForEach(0..<seq.count, id: \.self) { i in
+                let c = seq[i]
+                _cell(
+                    x: c.x, y: m.headY, w: c.w, h: m.leftHeaderH,
+                    bg: Theme.leftHeaderBg,
+                    txt: c.label,
+                    txtCol: Theme.leftHeaderText,
+                    fsz: headerFont
+                )
+            }
+        }
+        // Run your non-view side effects at safe times:
+        .onAppear {
+            _skinInputs()
+            _syncHeartsCellsFromTeams()
+        }
+        .onChange(of: design) { _ in
+            _skinInputs()
+            _syncHeartsCellsFromTeams()
+        }
+    }
+
+    
+    // Inside ScoreTable
     var body: some View {
         GeometryReader { geo in
             DesignSpaceInRect(
-                designSize: CGSize(width: 1000, height: 600),   // your logical canvas
-                containerSize: geo.size                         // actual safe rect size
+                designSize: nil,                 // <- design == notch-safe size
+                containerSize: geo.size,
+                showGrid: true,                  // replicate DesignSpace grid first
+                gridDivs: 30,
+                scaleMode: .fit
             ) { design in
-                // Draw the real element in *design* coords
-                headerSectionCanvas(size: design)
-                    .frame(width: design.width, height: design.height, alignment: .topLeading)
+                ZStack(alignment: .topLeading) {
+                    // grid is drawn by DesignSpaceInRect(showGrid:true)
+                    headerRow(in: design)        // same coordinates as Codea
+                        .frame(width: design.width, height: design.height, alignment: .topLeading)
+                }
             }
         }
     }
-    
-    
-    
-//    var body: some View {
-//        EmptyView()
-//            .onAppear {
-//                selfLayout()
-//                _skinInputs()
-//            }
-//        //    not translated bc data binding obsoletes syncing
-//        //    self:syncBack()
-//        //    ScoreRules.syncHeartsMoon(self.teams)
-//        //    self:_syncHeartsCellsFromTeams()
-//
-//        //moved outside of this method: Codea convenience assignments of variables in the metrics table
-//        
-//        // --- widths for right-side groups
-//        let a = metricsAliases()
-//        let m = a.m
-//
-//        let handGroupW: CGFloat  = a.wScore * 3
-//        let totalGroupW: CGFloat = a.wScore * 3
-//        let grandGroupW: CGFloat = a.wScore * 1
-//
-//        // --- find a font that fits all header cells
-//        let headerFont: CGFloat = [
-//            fitFontSize("TEAMS",        m.wName - 10,          m.leftHeaderH - 8, lines: 1),
-//            fitFontSize("SPADES",       a.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
-//            fitFontSize("HEARTS",       m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
-//            fitFontSize("Hand\nScores", handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
-//            fitFontSize("Total\nScores",totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
-//            fitFontSize("Grand\nTotal", grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
-//        ].min() ?? 12
-//        
-//        let x0 = m.innerX
-//
-//        Group {
-//            // LEFT section titles
-//            _cell(x: x0,
-//                  y: m.headY,
-//                  w: m.wName,
-//                  h: m.leftHeaderH,
-//                  bg: Theme.leftHeaderBg,
-//                  txt: "TEAMS",
-//                  txtCol: Theme.leftHeaderText,
-//                  fsz: headerFont)
-//
-//            _cell(x: x0 + m.wName,
-//                  y: m.headY,
-//                  w: m.wNarrow * 3,
-//                  h: m.leftHeaderH,
-//                  bg: Theme.leftHeaderBg,
-//                  txt: "SPADES",
-//                  txtCol: Theme.leftHeaderText,
-//                  fsz: headerFont)
-//
-//            _cell(x: x0 + m.wName + m.wNarrow * 3,
-//                  y: m.headY,
-//                  w: m.wHearts * 3,
-//                  h: m.leftHeaderH,
-//                  bg: Theme.leftHeaderBg,
-//                  txt: "HEARTS",
-//                  txtCol: Theme.leftHeaderText,
-//                  fsz: headerFont)
-//
-//            if m.gapW > 0 {
-//                _cell(x: x0 + m.wName + m.wNarrow * 3 + m.wHearts * 3,
-//                      y: m.headY,
-//                      w: m.gapW,
-//                      h: m.leftHeaderH,
-//                      bg: Theme.leftHeaderBg,
-//                      txt: nil)
-//            }
-//
-//            // RIGHT group titles
-//            let xRightStart = x0 + m.wName + m.wNarrow * 3 + m.wHearts * 3 + max(0 as CGFloat, m.gapW)
-//
-//            _cell(x: xRightStart,
-//                  y: m.headY,
-//                  w: handGroupW,
-//                  h: m.leftHeaderH,
-//                  bg: Theme.leftHeaderBg,
-//                  txt: "HAND\nSCORES",
-//                  txtCol: Theme.leftHeaderText,
-//                  fsz: headerFont)
-//
-//            _cell(x: xRightStart + handGroupW,
-//                  y: m.headY,
-//                  w: totalGroupW,
-//                  h: m.leftHeaderH,
-//                  bg: Theme.leftHeaderBg,
-//                  txt: "TOTAL\nSCORES",
-//                  txtCol: Theme.leftHeaderText,
-//                  fsz: headerFont)
-//
-//            _cell(x: xRightStart + handGroupW + totalGroupW,
-//                  y: m.headY,
-//                  w: grandGroupW,
-//                  h: m.leftHeaderH,
-//                  bg: Theme.leftHeaderBg,
-//                  txt: "GRAND\nTOTAL",
-//                  txtCol: Theme.leftHeaderText,
-//                  fsz: headerFont)
-//        }
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//        
-//    }
     
     private func _syncHeartsCellsFromTeams() {
         // Codea: self:_syncHeartsCellsFromTeams()
@@ -1066,18 +888,23 @@ struct ScoreTable: View {
     }
 }
 
-// --- Preview with tiny stub data ---
-#Preview {
-    let team1 = Teams(
-        players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)],
-        hearts: 0, queensSpades: false, moonShot: false
-    )
-    let team2 = Teams(
-        players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)],
-        hearts: 0, queensSpades: false, moonShot: false
-    )
-    return ScoreTable(teams: [team1, team2])
+
+// REPLACE the existing ScoreTable preview with this:
+#Preview("ScoreTable grid inside NotchSafeView", traits: .landscapeLeft) {
+    let team1 = Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)],
+                      hearts: 0, queensSpades: false, moonShot: false)
+    let team2 = Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)],
+                      hearts: 0, queensSpades: false, moonShot: false)
+
+    return NotchSafeView(heightPercent: 100,
+                         paddingPercentNotchSide: 0,
+                         paddingPercentSideOppositeNotch: 0) { safeRect in
+        // Constrain ScoreTable to the notch-safe rect so GeometryReader gets that size
+        ScoreTable(teams: [team1, team2])
+            .frame(width: safeRect.width, height: safeRect.height)
+    }
 }
+
 
 
 

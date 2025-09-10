@@ -77,7 +77,7 @@ import SwiftUI
 // CHANGE signature
 // CHANGE signature
 struct DesignSpaceInRect<Content: View>: View {
-    let designSize: CGSize
+    let designSize: CGSize?
     let containerSize: CGSize
     var showGrid: Bool = false
     var gridDivs: Int = 20
@@ -85,16 +85,19 @@ struct DesignSpaceInRect<Content: View>: View {
     @ViewBuilder var content: (CGSize) -> Content
     
     var body: some View {
-        let s = dsScale(containerSize, designSize, scaleMode)
+        // In body, REPLACE the scale + all uses of `designSize` with `design`
+        let design = designSize ?? containerSize     // ← key line
+        let s = dsScale(containerSize, design, scaleMode)
+
         ZStack(alignment: .topLeading) {
             if showGrid {
-                DesignGrid(size: designSize, step: designSize.width / CGFloat(gridDivs))
+                DesignGrid(size: design, step: design.width / CGFloat(gridDivs))
                     .allowsHitTesting(false)
-                    .frame(width: designSize.width, height: designSize.height, alignment: .topLeading)
-                .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
+                    .frame(width: design.width, height: design.height, alignment: .topLeading)
+                    .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
             }
-            content(designSize) // draw in *design* coords, top-left origin
-                .frame(width: designSize.width, height: designSize.height, alignment: .topLeading)
+            content(design)
+                .frame(width: design.width, height: design.height, alignment: .topLeading)
                 .scaleEffect(x: s.x, y: s.y, anchor: .topLeading)
         }
         .frame(width: containerSize.width, height: containerSize.height, alignment: .topLeading)
@@ -175,7 +178,7 @@ struct DesignGrid: View {
                 path.addLine(to: CGPoint(x: size.width, y: y))
                 y += step
             }
-            ctx.stroke(path, with: .color(ThemeX.gridLine), lineWidth: 10)
+            ctx.stroke(path, with: .color(ThemeX.gridLine), lineWidth: 6)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
@@ -228,15 +231,15 @@ struct DesignSpaceProof: View {
 
         // REPLACE this whole PercentCanvas{...} with:
         DesignSpaceInRect(
-            designSize: CGSize(width: 1000, height: 600),
+            designSize: nil,                // ← auto: match notch-safe size
             containerSize: safeRect.size,
             showGrid: true,
-            gridDivs: 20,
-            scaleMode: .stretch
+            gridDivs: 30,
+            scaleMode: .fit                 // any mode results in 1:1 when sizes match
         ) { design in
-            // DEBUG outline around the full design canvas
+            // design == safeRect.size here
             Rectangle().stroke(.red, lineWidth: 2)
-                .frame(width: design.width, height: design.height, alignment: .topLeading)
+                .frame(width: design.width, height: design.height)
 
             // Proofs now use *design* coords (device-independent)
             let cw = design.width * 0.10
