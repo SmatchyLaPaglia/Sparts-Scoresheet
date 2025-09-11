@@ -86,7 +86,7 @@ struct LayoutParams {
 
     static var `default`: LayoutParams {
         LayoutParams(
-            overallWidthPercent: 100,
+            overallWidthPercent: 20,
             overallHeightPercent: 60,
             overallInnerPadding: 8,
             leftTableWidthPercent: 62,
@@ -196,18 +196,18 @@ struct ScoreTable: View {
     
     @ViewBuilder
     func headerSectionCanvas(size: CGSize) -> some View {
-        let m = selfLayout(size)               // your existing layout -> Metrics
+        let m = selfLayout(size)
         let handGroupW  = m.wScore * 3
         let totalGroupW = m.wScore * 3
         let grandGroupW = m.wScore * 1
 
         let headerFont = min(
-            fitFontSize("TEAMS",         m.wName - 10,          m.leftHeaderH - 8, lines: 1),
-            fitFontSize("SPADES",        m.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
-            fitFontSize("HEARTS",        m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
-            fitFontSize("Hand\nScores",  handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
-            fitFontSize("Total\nScores", totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
-            fitFontSize("Grand\nTotal",  grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
+            fitFontSize("TEAMS", m.wName - 10, m.leftHeaderH - 8, lines: 1),
+            fitFontSize("SPADES", m.wNarrow * 3 - 10, m.leftHeaderH - 8, lines: 1),
+            fitFontSize("HEARTS", m.wHearts * 3 - 10, m.leftHeaderH - 8, lines: 1),
+            fitFontSize("Hand\nScores", handGroupW - 10, m.leftHeaderH - 8, lines: 2),
+            fitFontSize("Total\nScores", totalGroupW - 10, m.leftHeaderH - 8, lines: 2),
+            fitFontSize("Grand\nTotal", grandGroupW - 10, m.leftHeaderH - 8, lines: 2)
         )
 
         Canvas { ctx, _ in
@@ -246,7 +246,6 @@ struct ScoreTable: View {
         }
         .allowsHitTesting(false)
         .dynamicTypeSize(.medium)   // lock text so it doesn’t auto-scale
-        .ignoresSafeArea()          // we’re using your own safe-area math already
     }
 
     private func setCellFrame(key: String, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
@@ -320,118 +319,7 @@ struct ScoreTable: View {
     
     // no-op placeholder; we’ll attach gestures later in the rendering layer
     private func assignLongPressCellActions(_ key: String) { /* no-op */ }
-    
-    // MARK: - ScoreTable.layout (line-by-line from Codea)
 
-    private func selfLayout() {
-        let safeW = UIScreen.main.bounds.width
-        let safeH = UIScreen.main.bounds.height
-        let overallW = safeW * layout.overallWidthPercent / 100
-        let overallH = safeH * layout.overallHeightPercent / 100
-        let overallX = (safeW - overallW) / 2
-        let overallY = (safeH - overallH) / 2
-        let pad = layout.overallInnerPadding
-        let innerX = overallX + pad
-        let innerY = overallY + pad
-        let innerW = overallW - pad*2
-        let innerH = overallH - pad*2
-
-        // left / gap / right widths & tables height
-        let leftW  = innerW * layout.leftTableWidthPercent / 100
-        let gapW   = innerW * layout.gapTablesPercent      / 100
-        let rightW = max(0, innerW - leftW - gapW)
-        let tablesH = innerH * layout.tablesHeightPercent / 100
-        
-        //   - write to `numberFontSize` only if it’s a @State (otherwise skip for now)
-        var m = metrics
-
-        // -- Heights
-        m.leftHeaderH  = max(28, min(64, tablesH / 5))
-        m.leftRowH     = m.leftHeaderH
-        m.rightHeaderH = m.leftHeaderH
-        // right table rows should match left table row height (no double height)
-        m.rightRowH    = m.leftRowH
-
-        // -- Column widths
-        m.wName   = leftW * LeftCols.nameFrac
-        m.wNarrow = leftW * LeftCols.narrowFrac
-        m.wHearts = leftW * LeftCols.heartsFrac
-        m.wScore  = rightW / CGFloat(RIGHT.cols)
-
-        // -- Anchors
-        m.innerX = innerX
-        m.innerY = innerY
-        m.leftW  = leftW
-        m.gapW   = gapW
-        m.rightW = rightW
-        m.tablesH = tablesH
-
-        // -- Y positions
-        m.headY         = innerY + tablesH - m.leftHeaderH
-        m.yAfterHeadGap = m.headY - layout.headerGap
-        m.t1_row1       = m.yAfterHeadGap - m.leftRowH
-        m.t1_row2       = m.t1_row1 - m.leftRowH
-        m.t2_row1       = m.t1_row2 - layout.teamGap - m.leftRowH
-        m.t2_row2       = m.t2_row1 - m.leftRowH
-
-        self.numberFontSize = m.leftRowH * 0.5
-
-        // -- Take one score-column from the right table to widen the name column
-        let bumpW = m.wScore                // width of one right-table column
-        m.wName   = m.wName + bumpW         // widen the TEAM/PLAYER name column
-        m.leftW   = m.leftW + bumpW         // shift the boundary between left and right tables
-        m.rightW  = m.rightW - bumpW        // shrink right table to keep total width consistent
-        m.wScore  = m.rightW / CGFloat(RIGHT.cols)  // recompute per-column width on the right
-
-        // -- Base X helpers
-        let x_afterLabel = m.innerX + m.wName + m.wNarrow        // after "bid/took"
-        let x_heartsCol  = m.innerX + m.wName + m.wNarrow * 3
-        let x_qsCol      = x_heartsCol + m.wHearts
-        let x_moonCol    = x_heartsCol + m.wHearts * 2
-
-        // -- Name cell rectangles
-        func nameRect(_ y: CGFloat) -> CGRect {
-            CGRect(x: m.innerX, y: y, width: m.wName, height: m.leftRowH)
-        }
-        setLPFrame("t1_p1_name", nameRect(m.t1_row1))
-        setLPFrame("t1_p2_name", nameRect(m.t1_row2))
-        setLPFrame("t2_p1_name", nameRect(m.t2_row1))
-        setLPFrame("t2_p2_name", nameRect(m.t2_row2))
-
-        // -- TEAMS header cell rectangle
-        setLPFrame(
-            "headerTeam",
-            CGRect(x: m.innerX, y: m.headY, width: m.wName, height: m.leftHeaderH)
-        )
-
-        // -- Team 1, player 1 (top row)
-        setCellFrame(key: "t1_p1_bid",   x: x_afterLabel,             y: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
-        setCellFrame(key: "t1_p1_took",  x: x_afterLabel + m.wNarrow, y: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
-
-        // -- Team 1, player 2 (bottom row)
-        setCellFrame(key: "t1_p2_bid",   x: x_afterLabel,             y: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
-        setCellFrame(key: "t1_p2_took",  x: x_afterLabel + m.wNarrow, y: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
-        setCellFrame(key: "t1_hearts",   x: x_heartsCol,              y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
-        setCellFrame(key: "t1_qs",       x: x_qsCol,                  y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
-        setCellFrame(key: "t1_moon",     x: x_moonCol,                y: m.t1_row2, w: m.wHearts, h: m.leftRowH)
-
-        // -- Team 2, player 1 (top row)
-        setCellFrame(key: "t2_p1_bid",   x: x_afterLabel,             y: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
-        setCellFrame(key: "t2_p1_took",  x: x_afterLabel + m.wNarrow, y: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
-
-        // -- Team 2, player 2 (bottom row)
-        setCellFrame(key: "t2_p2_bid",   x: x_afterLabel,             y: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
-        setCellFrame(key: "t2_p2_took",  x: x_afterLabel + m.wNarrow, y: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
-        setCellFrame(key: "t2_hearts",   x: x_heartsCol,              y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
-        setCellFrame(key: "t2_qs",       x: x_qsCol,                  y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
-        setCellFrame(key: "t2_moon",     x: x_moonCol,                y: m.t2_row2, w: m.wHearts, h: m.leftRowH)
-
-        self.numberFontSize = m.leftRowH * 0.5   // (match Codea placement)
-
-        metrics = m
-        
-        applyNumberFontSize()
-    }
 
     // Direct line-by-line analog to setLongPressEnabled(on)
     func setLongPressEnabled(_ on: Bool = true) {
@@ -808,9 +696,7 @@ struct ScoreTable: View {
         return m
     }
     
-    private func headerRow(in design: CGSize) -> some View {
-        // 1) compute layout from the design size
-        let m = selfLayout(design)
+    private func headerRow(m: Metrics) -> some View {
 
         // 2) widths for right-side groups
         let handGroupW  = m.wScore * 3
@@ -856,10 +742,6 @@ struct ScoreTable: View {
             _skinInputs()
             _syncHeartsCellsFromTeams()
         }
-        .onChange(of: design) { _ in
-            _skinInputs()
-            _syncHeartsCellsFromTeams()
-        }
     }
 
     
@@ -867,16 +749,19 @@ struct ScoreTable: View {
     var body: some View {
         GeometryReader { geo in
             DesignSpaceInRect(
-                designSize: nil,                 // <- design == notch-safe size
+                designSize: nil,
                 containerSize: geo.size,
-                showGrid: true,                  // replicate DesignSpace grid first
+                showGrid: true,
                 gridDivs: 30,
                 scaleMode: .fit
             ) { design in
+                let m = selfLayout(design) // <- ONLY source of table dimensions
                 ZStack(alignment: .topLeading) {
-                    // grid is drawn by DesignSpaceInRect(showGrid:true)
-                    headerRow(in: design)        // same coordinates as Codea
-                        .frame(width: design.width, height: design.height, alignment: .topLeading)
+                    headerRow(m: m) // <- uses only m + layout
+                }
+                .onChange(of: design) { _ in
+                    _skinInputs()
+                    _syncHeartsCellsFromTeams()
                 }
             }
         }
