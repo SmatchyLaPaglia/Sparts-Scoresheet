@@ -86,9 +86,9 @@ struct LayoutParams {
 
     static var `default`: LayoutParams {
         LayoutParams(
-            overallWidthPercent: 20,
+            overallWidthPercent: 100,
             overallHeightPercent: 60,
-            overallInnerPadding: 8,
+            overallInnerPadding: 0,
             leftTableWidthPercent: 62,
             gapTablesPercent: 2,
             tablesHeightPercent: 80,
@@ -474,32 +474,25 @@ struct ScoreTable: View {
         return ScoreRules.heartsReady(teams[i])
     }
     
-    // Inside ScoreTable or as a separate struct
-    @ViewBuilder
-    func _cell(x: CGFloat,
-               y: CGFloat,
-               w: CGFloat,
-               h: CGFloat,
-               bg: Color,
-               txt: String? = nil,
-               txtCol: Color = Theme.textOnLight,
-               fsz: CGFloat? = nil) -> some View {
-        ZStack {
-            Rectangle()
-                .fill(bg)
-                .overlay(Rectangle().stroke(Theme.gridLine, lineWidth: 1))
-
-            if let text = txt {
-                Text(text)
-                    .font(.system(size: fsz ?? (h * 0.45), weight: .bold))
-                    .foregroundColor(txtCol)
-                    .multilineTextAlignment(.center)
-                    .frame(width: w, height: h)
-            }
+    // Codea-parallel: immediate-mode cell drawing
+    private func _cell(_ ctx: inout GraphicsContext,
+                       x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat,
+                       bg: Color,
+                       txt: String? = nil,
+                       txtCol: Color = Theme.textOnLight,
+                       fsz: CGFloat? = nil)
+    {
+        let r = CGRect(x: px(x), y: px(y), width: px(w), height: px(h))
+        ctx.fill(Path(r), with: .color(bg))
+        ctx.stroke(Path(r), with: .color(Theme.gridLine), lineWidth: 1)
+        if let label = txt {
+            var att = AttributedString(label)
+            att.font = .custom("HelveticaNeue-Bold", size: fsz ?? (h * 0.45))
+            att.foregroundColor = txtCol
+            ctx.draw(Text(att), in: r)
         }
-        .frame(width: w, height: h)
-        .position(x: x + w/2, y: y + h/2)
     }
+
     
     private func _skinInputs() {
         for (k, v) in cells {
@@ -580,59 +573,6 @@ struct ScoreTable: View {
         return best == .greatestFiniteMagnitude ? 8 : best
     }
     
-    @ViewBuilder
-    func headerSection(m: Metrics) -> some View {
-        // ---- compute outside the builder closure ----
-        let handGroupW  = m.wScore * 3
-        let totalGroupW = m.wScore * 3
-        let grandGroupW = m.wScore * 1
-
-        let headerFont = fitFontSize(
-            [
-                ("TEAMS",         m.wName - 10,           m.leftHeaderH - 8, 1),
-                ("SPADES",        m.wNarrow * 3 - 10,     m.leftHeaderH - 8, 1),
-                ("HEARTS",        m.wHearts * 3 - 10,     m.leftHeaderH - 8, 1),
-                ("Hand\nScores",  handGroupW - 10,        m.leftHeaderH - 8, 2),
-                ("Total\nScores", totalGroupW - 10,       m.leftHeaderH - 8, 2),
-                ("Grand\nTotal",  grandGroupW - 10,       m.leftHeaderH - 8, 2)
-            ]
-        )
-
-        let x0 = m.innerX
-        let x1 = x0 + m.wName
-        let x2 = x1 + m.wNarrow * 3
-        let x3 = x2 + m.wHearts * 3
-        let x4 = x3 + max(0 as CGFloat, m.gapW)
-        let x5 = x4 + handGroupW
-        let x6 = x5 + totalGroupW
-        // ---------------------------------------------
-
-        ZStack {
-            _cell(x: x0, y: m.headY, w: m.wName,        h: m.leftHeaderH,
-                  bg: Theme.leftHeaderBg, txt: "TEAMS", txtCol: Theme.leftHeaderText, fsz: headerFont)
-
-            _cell(x: x1, y: m.headY, w: m.wNarrow * 3,  h: m.leftHeaderH,
-                  bg: Theme.leftHeaderBg, txt: "SPADES", txtCol: Theme.leftHeaderText, fsz: headerFont)
-
-            _cell(x: x2, y: m.headY, w: m.wHearts * 3,  h: m.leftHeaderH,
-                  bg: Theme.leftHeaderBg, txt: "HEARTS", txtCol: Theme.leftHeaderText, fsz: headerFont)
-
-            if m.gapW > 0 {
-                _cell(x: x3, y: m.headY, w: m.gapW,     h: m.leftHeaderH,
-                      bg: Theme.leftHeaderBg, txt: nil)
-            }
-
-            _cell(x: x4, y: m.headY, w: handGroupW,     h: m.leftHeaderH,
-                  bg: Theme.leftHeaderBg, txt: "HAND\nSCORES",  txtCol: Theme.leftHeaderText, fsz: headerFont)
-
-            _cell(x: x5, y: m.headY, w: totalGroupW,    h: m.leftHeaderH,
-                  bg: Theme.leftHeaderBg, txt: "TOTAL\nSCORES", txtCol: Theme.leftHeaderText, fsz: headerFont)
-
-            _cell(x: x6, y: m.headY, w: grandGroupW,    h: m.leftHeaderH,
-                  bg: Theme.leftHeaderBg, txt: "GRAND\nTOTAL",  txtCol: Theme.leftHeaderText, fsz: headerFont)
-        }
-    }
-    
     // Pure version that computes and RETURNS Metrics from a size
     func selfLayout(_ size: CGSize) -> Metrics {
         let safeW = size.width
@@ -696,55 +636,6 @@ struct ScoreTable: View {
         return m
     }
     
-    private func headerRow(m: Metrics) -> some View {
-
-        // 2) widths for right-side groups
-        let handGroupW  = m.wScore * 3
-        let totalGroupW = m.wScore * 3
-        let grandGroupW = m.wScore * 1
-
-        // 3) font that fits *all* header cells (as in Codea)
-        let headerFont = min(
-            fitFontSize("TEAMS",         m.wName - 10,          m.leftHeaderH - 8, lines: 1),
-            fitFontSize("SPADES",        m.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
-            fitFontSize("HEARTS",        m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
-            fitFontSize("Hand\nScores",  handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
-            fitFontSize("Total\nScores", totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
-            fitFontSize("Grand\nTotal",  grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
-        )
-
-        // 4) build the sequence (exact Codea flow)
-        var seq: [(x: CGFloat, w: CGFloat, label: String?)] = []
-        var x = m.innerX
-        seq.append((x, m.wName,        "TEAMS"));            x += m.wName
-        seq.append((x, m.wNarrow * 3,  "SPADES"));           x += m.wNarrow * 3
-        seq.append((x, m.wHearts * 3,  "HEARTS"));           x += m.wHearts * 3
-        if m.gapW > 0 { seq.append((x, m.gapW, nil));        x += m.gapW }
-        seq.append((x, handGroupW,     "HAND\nSCORES"));     x += handGroupW
-        seq.append((x, totalGroupW,    "TOTAL\nSCORES"));    x += totalGroupW
-        seq.append((x, grandGroupW,    "GRAND\nTOTAL"))
-
-        // 5) draw
-        return ZStack(alignment: .topLeading) {
-            ForEach(0..<seq.count, id: \.self) { i in
-                let c = seq[i]
-                _cell(
-                    x: c.x, y: m.headY, w: c.w, h: m.leftHeaderH,
-                    bg: Theme.leftHeaderBg,
-                    txt: c.label,
-                    txtCol: Theme.leftHeaderText,
-                    fsz: headerFont
-                )
-            }
-        }
-        // Run your non-view side effects at safe times:
-        .onAppear {
-            _skinInputs()
-            _syncHeartsCellsFromTeams()
-        }
-    }
-
-    
     // Inside ScoreTable
     var body: some View {
         GeometryReader { geo in
@@ -755,17 +646,42 @@ struct ScoreTable: View {
                 gridDivs: 30,
                 scaleMode: .fit
             ) { design in
-                let m = selfLayout(design) // <- ONLY source of table dimensions
+                // == Codea: self:layout() ==
+                let m = selfLayout(design)
+
                 ZStack(alignment: .topLeading) {
-                    headerRow(m: m) // <- uses only m + layout
+
+                    // === TOP HEADER (exact Codea sequence, inline) ===
+                    Canvas { ctx, _ in
+                        // widths for right-side groups (needed for headerFont calc)
+                        let handGroupW  = m.wScore * 3
+                        let totalGroupW = m.wScore * 3
+                        let grandGroupW = m.wScore * 1
+
+                        let headerFont = min(
+                            fitFontSize("TEAMS",           m.wName - 10,        m.leftHeaderH - 8, lines: 1),
+                            fitFontSize("SPADES",          m.wNarrow * 3 - 10,  m.leftHeaderH - 8, lines: 1),
+                            fitFontSize("HEARTS",          m.wHearts * 3 - 10,  m.leftHeaderH - 8, lines: 1),
+                            fitFontSize("Hand\nScores",    handGroupW - 10,     m.leftHeaderH - 8, lines: 2),
+                            fitFontSize("Total\nScores",   totalGroupW - 10,    m.leftHeaderH - 8, lines: 2),
+                            fitFontSize("Grand\nTotal",    grandGroupW - 10,    m.leftHeaderH - 8, lines: 2)
+                        )
+
+                        var x = m.innerX
+                        _cell(&ctx,
+                              x: x, y: m.headY, w: m.wName, h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg,
+                              txt: "TEAMS", txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x = x + m.wName    // stop here on purpose
+                    }
+                    .allowsHitTesting(false)
+                    .dynamicTypeSize(.medium)
                 }
-                .onChange(of: design) { _ in
-                    _skinInputs()
-                    _syncHeartsCellsFromTeams()
-                }
+                // no state writes here -> avoids the "mutating during update" warning
             }
         }
     }
+
     
     private func _syncHeartsCellsFromTeams() {
         // Codea: self:_syncHeartsCellsFromTeams()
