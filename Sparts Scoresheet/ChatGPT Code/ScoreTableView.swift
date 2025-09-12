@@ -652,27 +652,76 @@ struct ScoreTable: View {
                 ZStack(alignment: .topLeading) {
 
                     // === TOP HEADER (exact Codea sequence, inline) ===
-                    Canvas { ctx, _ in
-                        // widths for right-side groups (needed for headerFont calc)
+                    Canvas { ctx, size in
+                        let H = size.height
+
+                        // widths for right-side groups (Codea vars)
                         let handGroupW  = m.wScore * 3
                         let totalGroupW = m.wScore * 3
                         let grandGroupW = m.wScore * 1
 
+                        // same font calc as before
                         let headerFont = min(
-                            fitFontSize("TEAMS",           m.wName - 10,        m.leftHeaderH - 8, lines: 1),
-                            fitFontSize("SPADES",          m.wNarrow * 3 - 10,  m.leftHeaderH - 8, lines: 1),
-                            fitFontSize("HEARTS",          m.wHearts * 3 - 10,  m.leftHeaderH - 8, lines: 1),
-                            fitFontSize("Hand\nScores",    handGroupW - 10,     m.leftHeaderH - 8, lines: 2),
-                            fitFontSize("Total\nScores",   totalGroupW - 10,    m.leftHeaderH - 8, lines: 2),
-                            fitFontSize("Grand\nTotal",    grandGroupW - 10,    m.leftHeaderH - 8, lines: 2)
+                            fitFontSize("TEAMS",         m.wName - 10,          m.leftHeaderH - 8, lines: 1),
+                            fitFontSize("SPADES",        m.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+                            fitFontSize("HEARTS",        m.wHearts * 3 - 10,    m.leftHeaderH - 8, lines: 1),
+                            fitFontSize("Hand\nScores",  handGroupW - 10,       m.leftHeaderH - 8, lines: 2),
+                            fitFontSize("Total\nScores", totalGroupW - 10,      m.leftHeaderH - 8, lines: 2),
+                            fitFontSize("Grand\nTotal",  grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
                         )
 
+                        // --- Codea-parallel header strip (y flipped inline) ---
                         var x = m.innerX
-                        _cell(&ctx,
-                              x: x, y: m.headY, w: m.wName, h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg,
-                              txt: "TEAMS", txtCol: Theme.leftHeaderText, fsz: headerFont)
-                        x = x + m.wName    // stop here on purpose
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wName,        h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "TEAMS",       txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x = x + m.wName
+
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wNarrow * 3,  h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "SPADES",      txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x = x + m.wNarrow * 3
+
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wHearts * 3,  h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "HEARTS",      txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x = x + m.wHearts * 3
+
+                        if m.gapW > 0 {
+                            _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.gapW,     h: m.leftHeaderH,
+                                  bg: Theme.leftHeaderBg, txt: nil)
+                            x = x + m.gapW
+                        }
+
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: handGroupW,     h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "HAND\nSCORES",  txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x = x + handGroupW
+
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: totalGroupW,    h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "TOTAL\nSCORES", txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x = x + totalGroupW
+
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: grandGroupW,    h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "GRAND\nTOTAL",  txtCol: Theme.leftHeaderText, fsz: headerFont)
+
+                        // ----------------------------------------------------------------------
+                        // LEFT TABLE (striped name rows, y flipped inline)
+                        // ----------------------------------------------------------------------
+                        let nameStripe: (Int) -> Color = { ($0 % 2 == 1) ? Theme.nameStripeLight : Theme.nameStripeDark }
+                        let nameFS  = m.leftRowH * 0.42
+                        let _ = m.leftRowH * 0.32 // chipFS placeholder to mirror Codea
+
+                        // placeholder names until Player has `name`
+                        func nameFor(_ t: Int, _ p: Int) -> String { "T\(t) P\(p)" }
+
+                        _cell(&ctx, x: m.innerX, y: H - (m.t1_row1 + m.leftRowH), w: m.wName, h: m.leftRowH,
+                              bg: nameStripe(1), txt: nameFor(1,1), txtCol: Theme.textOnLight, fsz: nameFS)
+
+                        _cell(&ctx, x: m.innerX, y: H - (m.t1_row2 + m.leftRowH), w: m.wName, h: m.leftRowH,
+                              bg: nameStripe(2), txt: nameFor(1,2), txtCol: Theme.textOnLight, fsz: nameFS)
+
+                        _cell(&ctx, x: m.innerX, y: H - (m.t2_row1 + m.leftRowH), w: m.wName, h: m.leftRowH,
+                              bg: nameStripe(1), txt: nameFor(2,1), txtCol: Theme.textOnLight, fsz: nameFS)
+
+                        _cell(&ctx, x: m.innerX, y: H - (m.t2_row2 + m.leftRowH), w: m.wName, h: m.leftRowH,
+                              bg: nameStripe(2), txt: nameFor(2,2), txtCol: Theme.textOnLight, fsz: nameFS)
                     }
                     .allowsHitTesting(false)
                     .dynamicTypeSize(.medium)
