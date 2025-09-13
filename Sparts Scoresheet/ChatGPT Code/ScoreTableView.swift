@@ -86,14 +86,14 @@ struct LayoutParams {
 
     static var `default`: LayoutParams {
         LayoutParams(
-            overallWidthPercent: 100,
-            overallHeightPercent: 60,
-            overallInnerPadding: 0,
-            leftTableWidthPercent: 62,
-            gapTablesPercent: 2,
-            tablesHeightPercent: 80,
-            headerGap: 4,
-            teamGap: 8
+            overallWidthPercent: 92.5,
+            overallHeightPercent: 50,
+            overallInnerPadding: 4,
+            leftTableWidthPercent: 51,
+            gapTablesPercent: 0,
+            tablesHeightPercent: 99.5,
+            headerGap: 5,
+            teamGap: 5
         )
     }
 }
@@ -132,9 +132,9 @@ struct Metrics {
 // MARK: - Column fractions (left table)
 enum LeftCols {
     // Fractions of left table width. Tune to your Codea values if needed.
-    static let nameFrac:   CGFloat = 0.34
-    static let narrowFrac: CGFloat = 0.08   // used twice (bid/took)
-    static let heartsFrac: CGFloat = 0.16   // used three times (hearts / QS / moon)
+    static let nameFrac:   CGFloat = 120/600
+    static let narrowFrac: CGFloat = 80/600   // used twice (bid/took)
+    static let heartsFrac: CGFloat = 80/600   // used three times (hearts / QS / moon)
     // 0.34 + 0.08*2 + 0.16*3 = 0.98 (leaves a hair for rounding)
 }
 
@@ -653,14 +653,15 @@ struct ScoreTable: View {
 
                     // === TOP HEADER (exact Codea sequence, inline) ===
                     Canvas { ctx, size in
-                        let H = size.height
+                        // Flip in the SAME space used to compute `m`
+                        let H = design.height
 
-                        // widths for right-side groups (Codea vars)
+                        // Right-table group widths (Codea vars)
                         let handGroupW  = m.wScore * 3
                         let totalGroupW = m.wScore * 3
                         let grandGroupW = m.wScore * 1
 
-                        // same font calc as before
+                        // Fit a single font size that works for all header cells (Codea pattern)
                         let headerFont = min(
                             fitFontSize("TEAMS",         m.wName - 10,          m.leftHeaderH - 8, lines: 1),
                             fitFontSize("SPADES",        m.wNarrow * 3 - 10,    m.leftHeaderH - 8, lines: 1),
@@ -670,46 +671,49 @@ struct ScoreTable: View {
                             fitFontSize("Grand\nTotal",  grandGroupW - 10,      m.leftHeaderH - 8, lines: 2)
                         )
 
-                        // --- Codea-parallel header strip (y flipped inline) ---
+                        // ----------------------------
+                        // TOP HEADER (Codea sequence)
+                        // ----------------------------
                         var x = m.innerX
-                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wName,        h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg, txt: "TEAMS",       txtCol: Theme.leftHeaderText, fsz: headerFont)
-                        x = x + m.wName
 
+                        _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wName,        h: m.leftHeaderH,
+                              bg: Theme.leftHeaderBg, txt: "TEAMS",         txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x += m.wName
+                        
                         _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wNarrow * 3,  h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg, txt: "SPADES",      txtCol: Theme.leftHeaderText, fsz: headerFont)
-                        x = x + m.wNarrow * 3
+                              bg: Theme.leftHeaderBg, txt: "SPADES",        txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x += m.wNarrow * 3
+
 
                         _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.wHearts * 3,  h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg, txt: "HEARTS",      txtCol: Theme.leftHeaderText, fsz: headerFont)
-                        x = x + m.wHearts * 3
+                              bg: Theme.leftHeaderBg, txt: "HEARTS",        txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x += m.wHearts * 3
+
 
                         if m.gapW > 0 {
                             _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: m.gapW,     h: m.leftHeaderH,
                                   bg: Theme.leftHeaderBg, txt: nil)
-                            x = x + m.gapW
+                            x += m.gapW
                         }
 
                         _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: handGroupW,     h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg, txt: "HAND\nSCORES",  txtCol: Theme.leftHeaderText, fsz: headerFont)
-                        x = x + handGroupW
+                              bg: Theme.leftHeaderBg, txt: "HAND\nSCORES",   txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x += handGroupW
 
                         _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: totalGroupW,    h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg, txt: "TOTAL\nSCORES", txtCol: Theme.leftHeaderText, fsz: headerFont)
-                        x = x + totalGroupW
+                              bg: Theme.leftHeaderBg, txt: "TOTAL\nSCORES",  txtCol: Theme.leftHeaderText, fsz: headerFont)
+                        x += totalGroupW
 
                         _cell(&ctx, x: x, y: H - (m.headY + m.leftHeaderH), w: grandGroupW,    h: m.leftHeaderH,
-                              bg: Theme.leftHeaderBg, txt: "GRAND\nTOTAL",  txtCol: Theme.leftHeaderText, fsz: headerFont)
+                              bg: Theme.leftHeaderBg, txt: "GRAND\nTOTAL",   txtCol: Theme.leftHeaderText, fsz: headerFont)
 
-                        // ----------------------------------------------------------------------
-                        // LEFT TABLE (striped name rows, y flipped inline)
-                        // ----------------------------------------------------------------------
+                        // --------------------------------------------
+                        // LEFT TABLE name stripes (y flipped inline)
+                        // --------------------------------------------
                         let nameStripe: (Int) -> Color = { ($0 % 2 == 1) ? Theme.nameStripeLight : Theme.nameStripeDark }
                         let nameFS  = m.leftRowH * 0.42
-                        let _ = m.leftRowH * 0.32 // chipFS placeholder to mirror Codea
 
-                        // placeholder names until Player has `name`
-                        func nameFor(_ t: Int, _ p: Int) -> String { "T\(t) P\(p)" }
+                        func nameFor(_ t: Int, _ p: Int) -> String { "T\(t) P\(p)" } // placeholder
 
                         _cell(&ctx, x: m.innerX, y: H - (m.t1_row1 + m.leftRowH), w: m.wName, h: m.leftRowH,
                               bg: nameStripe(1), txt: nameFor(1,1), txtCol: Theme.textOnLight, fsz: nameFS)
@@ -723,8 +727,8 @@ struct ScoreTable: View {
                         _cell(&ctx, x: m.innerX, y: H - (m.t2_row2 + m.leftRowH), w: m.wName, h: m.leftRowH,
                               bg: nameStripe(2), txt: nameFor(2,2), txtCol: Theme.textOnLight, fsz: nameFS)
                     }
+                    .frame(width: design.width, height: design.height)
                     .allowsHitTesting(false)
-                    .dynamicTypeSize(.medium)
                 }
                 // no state writes here -> avoids the "mutating during update" warning
             }
@@ -761,6 +765,37 @@ struct ScoreTable: View {
 
 //-- ScoreTable.lua
 //-- Renders the two-table sheet and uses IncrementingCell + CheckboxCell.
+//
+//
+//
+//From Main tab:
+//
+//-------------------------------------------------
+//-- Layout “knobs”
+//-------------------------------------------------
+//layout = {
+//overallWidthPercent   = 92.5, -- of safe area
+//overallHeightPercent  = 50,   -- of safe area
+//overallInnerPadding   = 4,    -- inside big rounded box
+//
+//leftTableWidthPercent = 51,   -- of inner width
+//gapTablesPercent      = 0,    -- of inner width
+//tablesHeightPercent   = 99.5, -- of inner height
+//
+//headerGap = 5,                -- px between header row and data rows
+//teamGap   = 5,                -- px between team 1 and team 2 blocks
+//}
+//
+//-- Left table column fractions (sum of base = 600)
+//LeftCols = {
+//nameFrac   = 120/600,
+//narrowFrac =  80/600,
+//heartsFrac =  80/600,
+//}
+//
+//-- Right table: 7 equal columns
+//RIGHT = { cols = 7 }
+//
 //
 //ScoreTable = class()
 //
