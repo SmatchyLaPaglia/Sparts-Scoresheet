@@ -748,6 +748,84 @@ struct ScoreTable: View {
                         chipsRow(m.t1_row2)
                         chipsRow(m.t2_row1)
                         chipsRow(m.t2_row2)
+                        
+                        
+                        // ---------- Helpers for Codea-style cells (static rendering) ----------
+                        func Y(_ yCodea: CGFloat, _ h: CGFloat) -> CGFloat { H - (yCodea + h) }
+
+                        func drawNumCell(_ key: String, x: CGFloat, yCodea: CGFloat, w: CGFloat, h: CGFloat) {
+                            guard let c = cells[key] as? IncrementingCell else { return }
+                            let r = CGRect(x: px(x), y: px(Y(yCodea, h)), width: px(w), height: px(h))
+
+                            // background + stroke
+                            ctx.fill(Path(r), with: .color(c.colBg ?? Theme.cellBg))
+                            ctx.stroke(Path(r), with: .color(c.colStroke ?? Theme.gridLine), lineWidth: 1)
+
+                            // label (either number or "--" when unset)
+                            let label: String = (c.set && c.hasSet) ? String(c.value) : "--"
+                            var att = AttributedString(label)
+                            let fsz = (c.fontSize > 0 ? c.fontSize : (h * 0.5))
+                            att.font = .custom("HelveticaNeue-Bold", size: fsz)
+                            att.foregroundColor = (c.set && c.hasSet)
+                                ? (c.colText ?? Theme.textAccentBlue)
+                                : (c.colTextUnset ?? Theme.textDisabled)
+
+                            ctx.draw(Text(att), at: CGPoint(x: r.midX, y: r.midY), anchor: .center)
+                        }
+
+                        func drawCheckCell(_ key: String, x: CGFloat, yCodea: CGFloat, w: CGFloat, h: CGFloat) {
+                            guard let c = cells[key] as? CheckboxCell else { return }
+                            let r = CGRect(x: px(x), y: px(Y(yCodea, h)), width: px(w), height: px(h))
+
+                            // cell background + stroke
+                            ctx.fill(Path(r), with: .color(c.colBg ?? Theme.cellBg))
+                            ctx.stroke(Path(r), with: .color(c.colStroke ?? Theme.gridLine), lineWidth: 1)
+
+                            // inner box (like Codea’s checkbox)
+                            let inset: CGFloat = max(4, h * 0.22)
+                            let box = r.insetBy(dx: inset, dy: inset)
+                            ctx.stroke(Path(box), with: .color(Theme.gridLine), lineWidth: 1)
+
+                            // tick when true
+                            if c.value {
+                                var tick = Path()
+                                let p1 = CGPoint(x: box.minX + box.width*0.15, y: box.midY)
+                                let p2 = CGPoint(x: box.minX + box.width*0.40, y: box.minY + box.height*0.20)
+                                let p3 = CGPoint(x: box.maxX - box.width*0.15, y: box.maxY - box.height*0.20)
+                                tick.move(to: p1); tick.addLine(to: p2); tick.addLine(to: p3)
+                                ctx.stroke(tick, with: .color(c.colTick ?? Theme.checkboxTick), lineWidth: max(2, h*0.08))
+                            }
+                        }
+
+                        // ---------- Geometry helpers identical to Codea layout ----------
+                        let x_afterLabel = m.innerX + m.wName + m.wNarrow      // after “bid/took”
+                        let x_heartsCol  = m.innerX + m.wName + m.wNarrow*3
+                        let x_qsCol      = x_heartsCol + m.wHearts
+                        let x_moonCol    = x_heartsCol + m.wHearts*2
+
+                        // ---------- Interactive cells (static draw only) ----------
+                        // T1
+                        drawNumCell("t1_p1_bid",  x: x_afterLabel,             yCodea: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
+                        drawNumCell("t1_p1_took", x: x_afterLabel + m.wNarrow, yCodea: m.t1_row1, w: m.wNarrow, h: m.leftRowH)
+
+                        drawNumCell("t1_p2_bid",  x: x_afterLabel,             yCodea: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
+                        drawNumCell("t1_p2_took", x: x_afterLabel + m.wNarrow, yCodea: m.t1_row2, w: m.wNarrow, h: m.leftRowH)
+
+                        drawNumCell("t1_hearts",  x: x_heartsCol,              yCodea: m.t1_row2, w: m.wHearts, h: m.leftRowH)
+                        drawCheckCell("t1_qs",    x: x_qsCol,                  yCodea: m.t1_row2, w: m.wHearts, h: m.leftRowH)
+                        drawCheckCell("t1_moon",  x: x_moonCol,                yCodea: m.t1_row2, w: m.wHearts, h: m.leftRowH)
+
+                        // T2
+                        drawNumCell("t2_p1_bid",  x: x_afterLabel,             yCodea: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
+                        drawNumCell("t2_p1_took", x: x_afterLabel + m.wNarrow, yCodea: m.t2_row1, w: m.wNarrow, h: m.leftRowH)
+
+                        drawNumCell("t2_p2_bid",  x: x_afterLabel,             yCodea: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
+                        drawNumCell("t2_p2_took", x: x_afterLabel + m.wNarrow, yCodea: m.t2_row2, w: m.wNarrow, h: m.leftRowH)
+
+                        drawNumCell("t2_hearts",  x: x_heartsCol,              yCodea: m.t2_row2, w: m.wHearts, h: m.leftRowH)
+                        drawCheckCell("t2_qs",    x: x_qsCol,                  yCodea: m.t2_row2, w: m.wHearts, h: m.leftRowH)
+                        drawCheckCell("t2_moon",  x: x_moonCol,                yCodea: m.t2_row2, w: m.wHearts, h: m.leftRowH)
+
 
                     }
                     .frame(width: design.width, height: design.height)
@@ -782,7 +860,7 @@ struct ScoreTable: View {
 
         // The Codea screenshot overlay — EXACT view, just made see-through
         CodeaSnapshotView()
-            .opacity(0.05)              // tweak if you want more/less of the overlay
+            .opacity(0.25)              // tweak if you want more/less of the overlay
             .allowsHitTesting(false)    // don’t block interactions with your canvas
     }
 }
