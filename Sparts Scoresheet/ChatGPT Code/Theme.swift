@@ -13,12 +13,14 @@ enum Theme {
     static let gridLine        = Color(red: 0.125, green: 0.125, blue: 0.125)
     static let cellBg          = Color.white
     static let cellBgPressed   = Color(red: 0.91, green: 0.94, blue: 0.996)
+    static let textPrimary     = Color(red: 240/255.0, green: 240/255.0, blue: 240/255.0)
+    static let textSecondary   = Color(red: 180/255.0, green: 180/255.0, blue: 180/255.0)
     static let textOnLight     = Color.black
     static let textDisabled    = Color.gray.opacity(0.6)
     static let textAccentBlue  = Color(red: 0.24, green: 0.63, blue: 1.0)
 
 //    static let leftHeaderBg    = Color(red: 0.215, green: 0.215, blue: 0.215)
-    static let leftHeaderBg    = Color(red: 0.415, green: 0.515, blue: 0.415)
+    static let leftHeaderBg    = Color(red: 0.385, green: 0.385, blue: 0.385)
 
     static let leftHeaderText  = Color.orange
 

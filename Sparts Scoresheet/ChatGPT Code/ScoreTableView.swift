@@ -86,9 +86,9 @@ struct LayoutParams {
 
     static var `default`: LayoutParams {
         LayoutParams(
-            overallWidthPercent: 92.5,
+            overallWidthPercent: 98.9,
             overallHeightPercent: 50,
-            overallInnerPadding: 4,
+            overallInnerPadding: 0.5,
             leftTableWidthPercent: 51,
             gapTablesPercent: 0,
             tablesHeightPercent: 99.5,
@@ -131,11 +131,9 @@ struct Metrics {
 
 // MARK: - Column fractions (left table)
 enum LeftCols {
-    // Fractions of left table width. Tune to your Codea values if needed.
-    static let nameFrac:   CGFloat = 120/600
-    static let narrowFrac: CGFloat = 80/600   // used twice (bid/took)
-    static let heartsFrac: CGFloat = 80/600   // used three times (hearts / QS / moon)
-    // 0.34 + 0.08*2 + 0.16*3 = 0.98 (leaves a hair for rounding)
+    static let nameFrac   : CGFloat = 120.0 / 600.0   // 0.20
+     static let narrowFrac : CGFloat =  80.0 / 600.0   // 0.1333…
+     static let heartsFrac : CGFloat =  80.0 / 600.0   // 0.1333…
 }
 
 // MARK: - Right table column count
@@ -193,60 +191,6 @@ struct ScoreTable: View {
 
     @inline(__always)
     private func px(_ v: CGFloat) -> CGFloat { (v * displayScale).rounded() / displayScale }
-    
-    @ViewBuilder
-    func headerSectionCanvas(size: CGSize) -> some View {
-        let m = selfLayout(size)
-        let handGroupW  = m.wScore * 3
-        let totalGroupW = m.wScore * 3
-        let grandGroupW = m.wScore * 1
-
-        let headerFont = min(
-            fitFontSize("TEAMS", m.wName - 10, m.leftHeaderH - 8, lines: 1),
-            fitFontSize("SPADES", m.wNarrow * 3 - 10, m.leftHeaderH - 8, lines: 1),
-            fitFontSize("HEARTS", m.wHearts * 3 - 10, m.leftHeaderH - 8, lines: 1),
-            fitFontSize("Hand\nScores", handGroupW - 10, m.leftHeaderH - 8, lines: 2),
-            fitFontSize("Total\nScores", totalGroupW - 10, m.leftHeaderH - 8, lines: 2),
-            fitFontSize("Grand\nTotal", grandGroupW - 10, m.leftHeaderH - 8, lines: 2)
-        )
-
-        Canvas { ctx, _ in
-            func drawCell(x: CGFloat, w: CGFloat, label: String?) {
-                let r = CGRect(
-                    x: px(x),
-                    y: px(m.headY),
-                    width: px(w),
-                    height: px(m.leftHeaderH)
-                ).integral
-
-                // fill + 1pt stroke (exactly like Codea)
-                ctx.fill(Path(r), with: .color(Theme.leftHeaderBg))
-                ctx.stroke(Path(r), with: .color(Theme.gridLine), lineWidth: 1)
-
-                guard let label = label else { return }
-
-                var att = AttributedString(label)
-                att.font = .custom("HelveticaNeue-Bold", size: headerFont)
-                att.foregroundColor = Theme.leftHeaderText
-
-                // Center the text in the rect (Canvas handles this reliably)
-                ctx.draw(Text(att), in: r)
-            }
-
-            var x = m.innerX
-            // LEFT titles
-            drawCell(x: x,                     w: m.wName,        label: "TEAMS");          x += m.wName
-            drawCell(x: x,                     w: m.wNarrow * 3,  label: "SPADES");         x += m.wNarrow * 3
-            drawCell(x: x,                     w: m.wHearts * 3,  label: "HEARTS");         x += m.wHearts * 3
-            if m.gapW > 0 { drawCell(x: x,     w: m.gapW,         label: nil);              x += m.gapW }
-            // RIGHT group titles
-            drawCell(x: x,                     w: handGroupW,     label: "HAND\nSCORES");   x += handGroupW
-            drawCell(x: x,                     w: totalGroupW,    label: "TOTAL\nSCORES");  x += totalGroupW
-            drawCell(x: x,                     w: grandGroupW,    label: "GRAND\nTOTAL")
-        }
-        .allowsHitTesting(false)
-        .dynamicTypeSize(.medium)   // lock text so it doesn’t auto-scale
-    }
 
     private func setCellFrame(key: String, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
         if var inc = cells[key] as? IncrementingCell {
@@ -474,24 +418,40 @@ struct ScoreTable: View {
         return ScoreRules.heartsReady(teams[i])
     }
     
-    // Codea-parallel: immediate-mode cell drawing
+    private enum CellTextAlign {
+        case center
+        case leading(pad: CGFloat = 8)   // left-aligned with optional inset
+    }
+
     private func _cell(_ ctx: inout GraphicsContext,
                        x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat,
                        bg: Color,
                        txt: String? = nil,
                        txtCol: Color = Theme.textOnLight,
-                       fsz: CGFloat? = nil)
+                       fsz: CGFloat? = nil,
+                       align: CellTextAlign = .center)
     {
         let r = CGRect(x: px(x), y: px(y), width: px(w), height: px(h))
         ctx.fill(Path(r), with: .color(bg))
         ctx.stroke(Path(r), with: .color(Theme.gridLine), lineWidth: 1)
-        if let label = txt {
-            var att = AttributedString(label)
-            att.font = .custom("HelveticaNeue-Bold", size: fsz ?? (h * 0.45))
-            att.foregroundColor = txtCol
-            ctx.draw(Text(att), in: r)
+
+        guard let label = txt else { return }
+
+        var att = AttributedString(label)
+        att.font = .custom("HelveticaNeue-Bold", size: fsz ?? (h * 0.45))
+        att.foregroundColor = txtCol
+
+        switch align {
+        case .center:
+            // perfect center in both axes
+            ctx.draw(Text(att), at: CGPoint(x: r.midX, y: r.midY), anchor: .center)
+
+        case .leading(let pad):
+            // left-aligned, vertically centered
+            ctx.draw(Text(att), at: CGPoint(x: r.minX + pad, y: r.midY), anchor: .leading)
         }
     }
+
 
     
     private func _skinInputs() {
@@ -716,16 +676,79 @@ struct ScoreTable: View {
                         func nameFor(_ t: Int, _ p: Int) -> String { "T\(t) P\(p)" } // placeholder
 
                         _cell(&ctx, x: m.innerX, y: H - (m.t1_row1 + m.leftRowH), w: m.wName, h: m.leftRowH,
-                              bg: nameStripe(1), txt: nameFor(1,1), txtCol: Theme.textOnLight, fsz: nameFS)
+                              bg: nameStripe(1), txt: nameFor(1,1), txtCol: Theme.textOnLight, fsz: nameFS,
+                              align: .leading(pad: 12))
 
                         _cell(&ctx, x: m.innerX, y: H - (m.t1_row2 + m.leftRowH), w: m.wName, h: m.leftRowH,
-                              bg: nameStripe(2), txt: nameFor(1,2), txtCol: Theme.textOnLight, fsz: nameFS)
+                              bg: nameStripe(2), txt: nameFor(1,2), txtCol: Theme.textOnLight, fsz: nameFS,
+                              align: .leading(pad: 12))
 
                         _cell(&ctx, x: m.innerX, y: H - (m.t2_row1 + m.leftRowH), w: m.wName, h: m.leftRowH,
-                              bg: nameStripe(1), txt: nameFor(2,1), txtCol: Theme.textOnLight, fsz: nameFS)
+                              bg: nameStripe(1), txt: nameFor(2,1), txtCol: Theme.textOnLight, fsz: nameFS,
+                              align: .leading(pad: 12))
 
                         _cell(&ctx, x: m.innerX, y: H - (m.t2_row2 + m.leftRowH), w: m.wName, h: m.leftRowH,
-                              bg: nameStripe(2), txt: nameFor(2,2), txtCol: Theme.textOnLight, fsz: nameFS)
+                              bg: nameStripe(2), txt: nameFor(2,2), txtCol: Theme.textOnLight, fsz: nameFS,
+                              align: .leading(pad: 12))
+                        
+                        // --- Chips helper (both rows), 1:1 with Codea ---
+                        let chipFS = m.leftRowH * 0.32
+
+                        func chipsRow(_ yCodea: CGFloat) {
+                            // Convert Codea Y (bottom-origin) to SwiftUI Canvas Y (top-origin)
+                            let y = H - (yCodea + m.leftRowH)
+
+                            // bid/took chip
+                            _cell(&ctx,
+                                  x: m.innerX + m.wName,
+                                  y: y,
+                                  w: m.wNarrow,
+                                  h: m.leftRowH,
+                                  bg: Theme.leftHeaderBg,
+                                  txt: "bid/took",
+                                  txtCol: Theme.textSecondary,
+                                  fsz: chipFS)
+
+                            // hearts chips
+                            let xh = m.innerX + m.wName + m.wNarrow * 3
+                            _cell(&ctx,
+                                  x: xh,
+                                  y: y,
+                                  w: m.wHearts,
+                                  h: m.leftRowH,
+                                  bg: Theme.leftHeaderBg,
+                                  txt: "hearts",
+                                  txtCol: Theme.textSecondary,
+                                  fsz: chipFS)
+
+                            _cell(&ctx,
+                                  x: xh + m.wHearts,
+                                  y: y,
+                                  w: m.wHearts,
+                                  h: m.leftRowH,
+                                  bg: Theme.leftHeaderBg,
+                                  txt: "queen",
+                                  txtCol: Theme.textSecondary,
+                                  fsz: chipFS)
+
+                            // NOTE: Codea used leftHeaderH for the moon chip height; mirroring that exactly.
+                            _cell(&ctx,
+                                  x: xh + m.wHearts * 2,
+                                  y: H - (yCodea + m.leftHeaderH),
+                                  w: m.wHearts,
+                                  h: m.leftRowH,
+                                  bg: Theme.leftHeaderBg,
+                                  txt: "moon",
+                                  txtCol: Theme.textSecondary,
+                                  fsz: chipFS)
+                        }
+
+                        // Call for all four rows (exact sequence)
+                        chipsRow(m.t1_row1)
+                        chipsRow(m.t1_row2)
+                        chipsRow(m.t2_row1)
+                        chipsRow(m.t2_row2)
+
                     }
                     .frame(width: design.width, height: design.height)
                     .allowsHitTesting(false)
@@ -742,24 +765,27 @@ struct ScoreTable: View {
     }
 }
 
-
-// REPLACE the existing ScoreTable preview with this:
-#Preview("ScoreTable grid inside NotchSafeView", traits: .landscapeLeft) {
+#Preview("ScoreTable + Codea overlay", traits: .landscapeLeft) {
     let team1 = Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)],
                       hearts: 0, queensSpades: false, moonShot: false)
     let team2 = Teams(players: [Player(bid: 0, took: 0), Player(bid: 0, took: 0)],
                       hearts: 0, queensSpades: false, moonShot: false)
 
-    return NotchSafeView(heightPercent: 100,
-                         paddingPercentNotchSide: 0,
-                         paddingPercentSideOppositeNotch: 0) { safeRect in
-        // Constrain ScoreTable to the notch-safe rect so GeometryReader gets that size
-        ScoreTable(teams: [team1, team2])
-            .frame(width: safeRect.width, height: safeRect.height)
+    ZStack {
+        // Your notch-safe canvas with the SwiftUI layout
+        NotchSafeView(heightPercent: 100,
+                      paddingPercentNotchSide: 0,
+                      paddingPercentSideOppositeNotch: 0) { safeRect in
+            ScoreTable(teams: [team1, team2])
+                .frame(width: safeRect.width, height: safeRect.height)
+        }
+
+        // The Codea screenshot overlay — EXACT view, just made see-through
+        CodeaSnapshotView()
+            .opacity(0.05)              // tweak if you want more/less of the overlay
+            .allowsHitTesting(false)    // don’t block interactions with your canvas
     }
 }
-
-
 
 
 

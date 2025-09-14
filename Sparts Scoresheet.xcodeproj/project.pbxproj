@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E4481C2D2E74C01A00AB9C71 /* IMG_6734.PNG in Resources */ = {isa = PBXBuildFile; fileRef = E4481C2C2E74C01A00AB9C71 /* IMG_6734.PNG */; };
+		E4481C312E75A97900AB9C71 /* FullscreenStretchImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4481C302E75A97900AB9C71 /* FullscreenStretchImage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,7 +31,7 @@
 		2D915F632E53B4F000537271 /* Sparts Scoresheet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Sparts Scoresheet.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D915F732E53B4F200537271 /* Sparts ScoresheetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Sparts ScoresheetTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D915F7D2E53B4F200537271 /* Sparts ScoresheetUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Sparts ScoresheetUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E4481C2C2E74C01A00AB9C71 /* IMG_6734.PNG */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = IMG_6734.PNG; sourceTree = "<group>"; };
+		E4481C302E75A97900AB9C71 /* FullscreenStretchImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenStretchImage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -80,7 +80,7 @@
 		2D915F5A2E53B4F000537271 = {
 			isa = PBXGroup;
 			children = (
-				E4481C2C2E74C01A00AB9C71 /* IMG_6734.PNG */,
+				E4481C302E75A97900AB9C71 /* FullscreenStretchImage.swift */,
 				2D915F652E53B4F000537271 /* Sparts Scoresheet */,
 				2D915F762E53B4F200537271 /* Sparts ScoresheetTests */,
 				2D915F802E53B4F200537271 /* Sparts ScoresheetUITests */,
@@ -218,7 +218,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E4481C2D2E74C01A00AB9C71 /* IMG_6734.PNG in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +242,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E4481C312E75A97900AB9C71 /* FullscreenStretchImage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
